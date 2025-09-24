@@ -1,3 +1,5 @@
+// src/screens/LoginScreen.tsx
+
 import React, { useState, useContext, useLayoutEffect } from 'react';
 import { SafeAreaView, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -5,6 +7,8 @@ import { StackNavigation, ApiResponse, AuthResult } from '../types';
 import { login } from '../service/mockApi';
 import LoginForm from '../components/LoginForm';
 import { AuthContext } from '../App';
+import { setupPushNotifications } from '../utils/pushNotifications'; 
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
 const LoginScreen = () => {
   const navigation = useNavigation<StackNavigation>();
@@ -49,6 +53,17 @@ const LoginScreen = () => {
         const { nickname } = response.result;
 
         signIn(nickname);
+
+        await AsyncStorage.setItem('userNickname', nickname);
+
+        // ✅ 수정된 부분: 푸시 알림 설정 코드를 try-catch로 감싸 에러가 발생해도 로그인 흐름이 중단되지 않도록 합니다.
+        try {
+          await setupPushNotifications();
+        } catch (pushErr) {
+          console.error("푸시 알림 설정 중 오류가 발생했습니다:", pushErr);
+          // 사용자에게 알림 기능이 제한될 수 있음을 알릴 수 있습니다.
+        }
+        
       } else {
         setError(response.message);
       }
@@ -65,6 +80,10 @@ const LoginScreen = () => {
   const handleSignUp = () => {
     navigation.navigate('SignUpScreen');
   };
+  
+  const handleGoBackToGuest = () => {
+    navigation.navigate('Lost');
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -80,6 +99,7 @@ const LoginScreen = () => {
               error={error}
               onLogin={handleLogin}
               onSignUp={handleSignUp}
+              onGoBackToGuest={handleGoBackToGuest} 
           />
       </KeyboardAvoidingView>
     </SafeAreaView>

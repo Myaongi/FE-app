@@ -9,6 +9,7 @@ interface LoginFormProps {
   error: string | null;
   onLogin: () => void;
   onSignUp: () => void;
+  onGoBackToGuest: () => void;
 }
 
 const LoginForm = ({
@@ -19,6 +20,7 @@ const LoginForm = ({
   error,
   onLogin,
   onSignUp,
+  onGoBackToGuest,
 }: LoginFormProps) => {
   const isEmailError = error === '유효하지 않은 이메일 주소입니다.';
   const isPasswordError = error === '이메일 또는 비밀번호가 올바르지 않습니다.';
@@ -51,7 +53,6 @@ const LoginForm = ({
 
       {isPasswordError && <Text style={styles.errorText}>비밀번호가 일치하지 않아요</Text>}
 
-
       <TouchableOpacity style={styles.loginButton} onPress={onLogin}>
         <Text style={styles.loginButtonText}>로그인</Text>
       </TouchableOpacity>
@@ -59,6 +60,12 @@ const LoginForm = ({
       <TouchableOpacity style={styles.signupButton} onPress={onSignUp}>
         <Text style={styles.signupButtonText}>회원가입</Text>
       </TouchableOpacity>
+      
+
+      <TouchableOpacity style={styles.guestButton} onPress={onGoBackToGuest}>
+        <Text style={styles.guestButtonText}>비회원으로 이용하기</Text>
+      </TouchableOpacity>
+      
     </View>
   );
 };
@@ -130,6 +137,15 @@ const styles = StyleSheet.create({
     color: '#6A5ACD',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+
+  guestButton: {
+    marginTop: 20,
+  },
+  guestButtonText: {
+    color: '#666',
+    fontSize: 15,
+    textDecorationLine: 'underline',
   },
 });
 

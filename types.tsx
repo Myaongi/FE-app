@@ -13,7 +13,7 @@ export type RootTabParamList = {
 
 // Stack 네비게이션에 포함될 모든 스크린 목록
 export type RootStackParamList = {
-  RootTab: undefined; // 하단 탭 내비게이터를 나타내는 스크린
+  RootTab: undefined; 
   PostDetail: { id: string; isMyPost?: boolean };
   WritePostScreen: { type: 'lost' | 'witnessed' };
   ChatDetail: { 
@@ -23,10 +23,14 @@ export type RootStackParamList = {
   };
 };
 
+
 export type AuthStackParamList = {
+  Lost: undefined; //guest user 둘 다 접근 가능하게
+  PostDetail: { id: string }; 
   LoginScreen: undefined;
   SignUpScreen: undefined;
 };
+
 
 export type StackNavigation = NativeStackNavigationProp<RootStackParamList & AuthStackParamList>;
 
@@ -69,6 +73,11 @@ export interface User {
   email: string;
   nickname: string;
   password?: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
+  pushToken?: string;
 }
 
 // 게시글 관련 타입
@@ -132,3 +141,10 @@ export interface Message {
   time: string;
   type: 'text' | 'image';
 }
+
+// 알림 데이터 타입
+export type PushNotificationData = {
+  type: 'MATCH_FOUND' | 'NEW_CHAT_MESSAGE' | 'WITNESS_REPORT' | 'NEW_POST_NEARBY';
+  postId?: string; 
+  chatRoomId?: string;
+};

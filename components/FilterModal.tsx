@@ -7,6 +7,7 @@ interface FilterModalProps {
   onClose: () => void;
   onApplyFilters: (filters: { distance: number | 'all'; time: number | 'all'; sortBy: 'latest' | 'distance' }) => void;
   initialFilters?: { distance: number | 'all'; time: number | 'all'; sortBy: 'latest' | 'distance' };
+  hasLocation: boolean;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -16,6 +17,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
   onClose,
   onApplyFilters,
   initialFilters = { distance: 'all', time: 'all', sortBy: 'latest' },
+  hasLocation,
 }) => {
   const [distance, setDistance] = useState<number | 'all'>(initialFilters.distance);
   const [time, setTime] = useState<number | 'all'>(initialFilters.time);
@@ -29,8 +31,19 @@ const FilterModal: React.FC<FilterModalProps> = ({
     }
   }, [visible, initialFilters]);
 
+
+  React.useEffect(() => {
+    if (!hasLocation && sortBy === 'distance') {
+      setSortBy('latest');
+    }
+  }, [hasLocation, sortBy]);
+
   const handleApply = () => {
-    onApplyFilters({ distance, time, sortBy });
+ 
+    const finalDistance = hasLocation ? distance : 'all';
+    const finalSortBy = hasLocation ? sortBy : 'latest';
+
+    onApplyFilters({ distance: finalDistance, time, sortBy: finalSortBy });
     onClose();
   };
 
@@ -57,12 +70,12 @@ const FilterModal: React.FC<FilterModalProps> = ({
     </TouchableOpacity>
   );
 
-  const RadioButton = ({ label, value, current, onPress }: { label: string; value: 'latest' | 'distance'; current: 'latest' | 'distance'; onPress: (v: 'latest' | 'distance') => void }) => (
-    <TouchableOpacity style={styles.radioContainer} onPress={() => onPress(value)}>
-      <View style={styles.outerCircle}>
+  const RadioButton = ({ label, value, current, onPress, disabled = false }: { label: string; value: 'latest' | 'distance'; current: 'latest' | 'distance'; onPress: (v: 'latest' | 'distance') => void; disabled?: boolean }) => (
+    <TouchableOpacity style={styles.radioContainer} onPress={() => !disabled && onPress(value)} disabled={disabled}>
+      <View style={[styles.outerCircle, disabled && styles.disabledCircle]}>
         {current === value && <View style={styles.innerCircle} />}
       </View>
-      <Text style={styles.radioLabel}>{label}</Text>
+      <Text style={[styles.radioLabel, disabled && styles.disabledLabel]}>{label}</Text>
     </TouchableOpacity>
   );
 
@@ -81,27 +94,30 @@ const FilterModal: React.FC<FilterModalProps> = ({
         <View style={styles.modalView} onStartShouldSetResponder={() => true}>
           <Text style={styles.modalTitle}>필터</Text>
 
-          {/* 위치 필터 */}
-          <Text style={styles.sectionTitle}>위치</Text>
-          <View style={styles.distanceLabelsContainer}>
+
+          <Text style={[styles.sectionTitle, !hasLocation && styles.disabledLabel]}>위치</Text>
+          <Text style={!hasLocation ? styles.hintText : null}>
+            {!hasLocation ? '위치 권한을 허용해야 이용할 수 있습니다.' : null}
+          </Text>
+          <View style={[styles.distanceLabelsContainer, !hasLocation && styles.disabledContainer]}>
             <Text style={distance === 1 ? styles.distanceLabelActive : styles.distanceLabel}>1km</Text>
             <Text style={distance === 3 ? styles.distanceLabelActive : styles.distanceLabel}>3km</Text>
             <Text style={distance === 5 ? styles.distanceLabelActive : styles.distanceLabel}>5km</Text>
             <Text style={distance === 'all' ? styles.distanceLabelActive : styles.distanceLabel}>전체</Text>
           </View>
           <Slider
-            style={styles.slider}
+            style={[styles.slider, !hasLocation && styles.disabledSlider]}
             minimumValue={0}
             maximumValue={3}
             step={1}
             value={getSliderValue(distance)}
             onValueChange={(val) => setDistance(getDistanceValue(val))}
-            minimumTrackTintColor="#6A5ACD"
+            minimumTrackTintColor={hasLocation ? "#6A5ACD" : "#d3d3d3"}
             maximumTrackTintColor="#d3d3d3"
-            thumbTintColor="#6A5ACD"
+            thumbTintColor={hasLocation ? "#6A5ACD" : "#d3d3d3"}
+            disabled={!hasLocation}
           />
 
-          {/* 시간 필터 */}
           <Text style={styles.sectionTitle}>시간</Text>
           <View style={styles.timeButtonsContainer}>
             <TimeButton label="1시간 이내" value={1} current={time} onPress={setTime} />
@@ -111,11 +127,10 @@ const FilterModal: React.FC<FilterModalProps> = ({
             <TimeButton label="전체" value={'all'} current={time} onPress={setTime} />
           </View>
 
-          {/* 정렬 옵션 */}
           <Text style={styles.sectionTitle}>정렬 옵션</Text>
           <View style={styles.sortOptionsContainer}>
             <RadioButton label="최신순" value="latest" current={sortBy} onPress={setSortBy} />
-            <RadioButton label="거리순" value="distance" current={sortBy} onPress={setSortBy} />
+            <RadioButton label="거리순" value="distance" current={sortBy} onPress={setSortBy} disabled={!hasLocation} />
           </View>
 
           <TouchableOpacity style={styles.applyButton} onPress={handleApply}>
@@ -256,6 +271,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  disabledLabel: {
+    color: '#aaa',
+  },
+  disabledCircle: {
+    borderColor: '#aaa',
+  },
+  disabledSlider: {
+    opacity: 0.5,
+  },
+  disabledContainer: {
+    opacity: 0.5,
+  },
+  hintText: {
+    color: '#aaa',
+    fontSize: 12,
+    marginTop: -5,
+    marginBottom: 10,
+    alignSelf: 'flex-start',
   },
 });
 

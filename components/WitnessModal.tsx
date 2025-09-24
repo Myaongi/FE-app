@@ -171,7 +171,7 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
       </TouchableWithoutFeedback>
 
       {show && (
-        <Modal transparent animationType="fade" visible={show} onRequestClose={() => setShow(false)}>
+        <Modal transparent animationType="fade" visible={show} onRequest-Close={() => setShow(false)}>
           <TouchableWithoutFeedback onPressOut={() => setShow(false)}>
             <View style={styles.pickerModalContainer}>
               <View style={styles.pickerContainer}>
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   pickerContainer: {
-    backgroundColor: 'white',
+    backgroundColor: '#333', 
     borderRadius: 12,
     padding: 16,
     width: '80%',

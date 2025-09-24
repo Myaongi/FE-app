@@ -341,6 +341,7 @@ export const login = (payload: LoginPayload): Promise<ApiResponse<AuthResult>> =
     }, 500);
   });
 };
+
 // 회원가입 함수
 export const signup = (payload: SignUpPayload): Promise<ApiResponse<null>> => {
   return new Promise((resolve, reject) => {
@@ -381,6 +382,48 @@ export const signup = (payload: SignUpPayload): Promise<ApiResponse<null>> => {
         message: '회원가입 성공',
         result: null,
       });
+    }, 500);
+  });
+};
+
+//사용자 위치 정보 저장
+export const saveUserLocation = (nickname: string, location: { latitude: number; longitude: number }): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const user = mockUsers.find(u => u.nickname === nickname);
+      if (user) {
+        // 기존 객체에 location 필드를 추가/업데이트
+        user.location = location;
+        console.log(`Mock: User ${nickname} location saved:`, location);
+        resolve();
+      } else {
+        // 회원가입으로 새로 추가된 유저일 경우를 대비
+        const newUser: User = { nickname, email: '', location };
+        mockUsers.push(newUser);
+        console.log(`Mock: New user ${nickname} created and location saved:`, location);
+        resolve();
+      }
+    }, 500);
+  });
+};
+
+// 푸시 토큰 저장 
+export const savePushToken = (nickname: string, pushToken: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const user = mockUsers.find(u => u.nickname === nickname);
+      if (user) {
+        // 기존 mockUsers 배열의 객체에 pushToken 필드를 추가/업데이트
+        user.pushToken = pushToken;
+        console.log(`Mock: User ${nickname} push token saved: ${pushToken}`);
+        resolve();
+      } else {
+        // 회원가입으로 새로 추가된 유저일 경우 대비
+        const newUser: User = { nickname, email: '', pushToken };
+        mockUsers.push(newUser);
+        console.log(`Mock: New user ${nickname} created and push token saved: ${pushToken}`);
+        resolve();
+      }
     }, 500);
   });
 };

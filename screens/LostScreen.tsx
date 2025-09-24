@@ -10,6 +10,8 @@ import FilterModal from '../components/FilterModal';
 import { getPosts } from '../service/mockApi';
 import { Post, StackNavigation } from '../types';
 import { AuthContext } from '../App';
+import * as Location from 'expo-location'; 
+import { getUserLocation } from '../utils/location'; 
 
 const LostScreen = () => {
   const [activeTab, setActiveTab] = useState<'lost' | 'witnessed'>('witnessed');
@@ -23,7 +25,8 @@ const LostScreen = () => {
     time: 'all' as 'all' | number,
     sortBy: 'latest' as 'latest' | 'distance',
   });
-  
+  const [hasLocationPermission, setHasLocationPermission] = useState<boolean>(false); 
+
   const navigation = useNavigation<StackNavigation>();
   const authContext = useContext(AuthContext);
 
@@ -42,9 +45,36 @@ const LostScreen = () => {
   useFocusEffect(
     useCallback(() => {
       setActiveTab('witnessed');
-      setIsFilterModalVisible(false); 
+      setIsFilterModalVisible(false);
+      
+      const requestAndSaveLocation = async () => {
+        // ✅ 수정된 부분: 위치 권한 요청 로직을 더욱 견고하게 개선
+        if (authContext?.isLoggedIn) {
+          console.log("로그인 상태: 위치 권한 요청 시작");
+          
+          let { status } = await Location.getForegroundPermissionsAsync();
+          
+          if (status !== 'granted') {
+            console.log("기존 권한 없음. 권한 팝업 요청...");
+            const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
+            status = newStatus;
+          }
+  
+          if (status === 'granted') {
+            console.log("위치 정보 접근 권한이 허용되었습니다. DB에 위치 정보 저장.");
+            setHasLocationPermission(true);
+            await getUserLocation();
+          } else {
+            console.log("위치 정보 접근 권한이 거부되었습니다. 알림 기능을 사용할 수 없습니다.");
+            setHasLocationPermission(false);
+          }
+        }
+      };
+      
+      requestAndSaveLocation();
+      
       return () => {};
-    }, [])
+    }, [authContext?.isLoggedIn])
   );
 
   const handleRefresh = useCallback(async () => {
@@ -64,7 +94,8 @@ const LostScreen = () => {
         ]
       );
     } else {
-      setIsWriteModalVisible(true);
+      navigation.navigate('WritePostScreen', { type: 'lost' }); 
+      setIsWriteModalVisible(false);
     }
   };
 
@@ -92,7 +123,13 @@ const LostScreen = () => {
     }
   };
 
-  const handleFilterPress = () => {
+  const handleFilterPress = async () => { 
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    setHasLocationPermission(status === 'granted');
+    if (status === 'granted' && !authContext?.isLoggedIn) {
+      const location = await Location.getCurrentPositionAsync({});
+      console.log('게스트 위치 정보:', location.coords);
+    }
     setIsFilterModalVisible(true);
   };
 
@@ -101,14 +138,16 @@ const LostScreen = () => {
   };
 
   const handleApplyFilters = useCallback((filters: { distance: number | 'all'; time: number | 'all'; sortBy: 'latest' | 'distance' }) => {
-  let safeTime = filters.time;
+    let safeTime = filters.time;
 
-  if (typeof filters.time === 'number' && filters.time > 720) {
-    safeTime = 'all';
-  }
+    if (typeof filters.time === 'number' && filters.time > 720) {
+      safeTime = 'all';
+    }
 
-  setCurrentFilters({ ...filters, time: safeTime });
-}, []);
+    console.log('적용된 필터:', filters);
+
+    setCurrentFilters({ ...filters, time: safeTime });
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -164,8 +203,8 @@ const LostScreen = () => {
         onClose={handleFilterModalClose}
         onApplyFilters={handleApplyFilters}
         initialFilters={currentFilters}
+        hasLocation={hasLocationPermission} 
       />
-
     </SafeAreaView>
   );
 };
