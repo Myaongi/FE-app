@@ -1,12 +1,12 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, AppStateStatus, Alert } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import { getChatRoomsByUserId, getNewMatchCount, saveUserLocation } from './service/mockApi';
-import * as Location from 'expo-location'; 
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // 화면 컴포넌트들
 import ChatDetailScreen from './screens/ChatDetailScreen';
@@ -15,20 +15,20 @@ import LoginScreen from './screens/LoginScreen';
 import LostScreen from './screens/LostScreen';
 import MatchScreen from './screens/MatchScreen';
 import MyPageScreen from './screens/MypageScreen';
+import NotificationsScreen from './screens/NotificationsScreen';
 import PostDetailScreen from './screens/PostDetailScreen';
 import SignUpScreen from './screens/SignUpScreen';
 import WritePostScreen from './screens/WritePostScreen';
-import NotificationsScreen from './screens/NotificationsScreen'; 
 
 import PostDetailGuestScreen from './screens/PostDetailGuestScreen';
+import ReportScreen from './screens/ReportScreen';
 
 // 유틸리티 및 타입
 import ChatIcon from './assets/images/chat.svg';
 import HomeIcon from './assets/images/home.svg';
 import MatchIcon from './assets/images/match.svg';
 import MyPageIcon from './assets/images/mypage.svg';
-import { AuthContextType, PushNotificationData, RootTabParamList, RootStackParamList, AuthStackParamList } from './types'; // ✅ 모든 타입 임포트
-import { getUserLocation } from './utils/location';
+import { AuthContextType, AuthStackParamList, PushNotificationData, RootStackParamList, RootTabParamList } from './types'; // ✅ 모든 타입 임포트
 import { setupPushNotifications } from './utils/pushNotifications';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -153,6 +153,7 @@ function MainAppStackScreen() {
             <MainStack.Screen name="WritePostScreen" component={WritePostScreen} />
             <MainStack.Screen name="ChatDetail" component={ChatDetailScreen} />
             <MainStack.Screen name="NotificationsScreen" component={NotificationsScreen} />
+            <MainStack.Screen name="Report" component={ReportScreen} />
         </MainStack.Navigator>
     );
 }

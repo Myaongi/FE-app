@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback, useContext } from 'react';
-import { View, ScrollView, SafeAreaView, StyleSheet, Alert } from 'react-native';
-import { useNavigation, useFocusEffect, type NavigationProp } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, type NavigationProp } from '@react-navigation/native';
+import React, { useContext, useState } from 'react';
+import { Alert, SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
+import { AuthContext } from '../App';
 import AppHeader from '../components/AppHeader';
 import ChatItem from '../components/ChatItem';
-import { getChatRoomsByUserId, getPostById,  getUserName, readChatRoom } from '../service/mockApi';
-import { RootStackParamList, ChatRoom, Post, } from '../types';
-import { AuthContext } from '../App'; 
+import { getChatRoomsByUserId, getPostById, getUserName, readChatRoom } from '../service/mockApi';
+import { RootStackParamList } from '../types';
 
 interface TransformedChatData {
   id: string;
@@ -18,6 +18,7 @@ interface TransformedChatData {
   unreadCount: number;
   postId: string;
   chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
+  lastMessageTime: string;
 }
 
 const ChatScreen = () => {
@@ -63,10 +64,17 @@ const ChatScreen = () => {
             unreadCount,
             postId: room.postId,
             chatContext: chatContext,
+            lastMessageTime: room.lastMessageTime, // 정렬을 위해 추가
           };
         })
       );
-      setChatList(transformedChats);
+      
+      // 최신 메시지 시간 순으로 정렬 (최신이 위로)
+      const sortedChats = transformedChats.sort((a, b) => {
+        return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
+      });
+      
+      setChatList(sortedChats);
     } catch (error) {
       console.error('채팅 목록을 불러오는 중 오류 발생:', error);
       Alert.alert('오류', '채팅 목록을 불러올 수 없습니다.');

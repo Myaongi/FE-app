@@ -1,10 +1,19 @@
 import {
-  Post, Match, GeocodeResult, ChatRoom, Message,
-  ApiResponse, LoginPayload, SignUpPayload, AuthResult, User, Notification
+  ApiResponse,
+  AuthResult,
+  ChatRoom,
+  GeocodeResult,
+  LoginPayload,
+  Match,
+  Message,
+  Notification,
+  Post,
+  SignUpPayload,
+  User
 } from '../types';
 
 let idCounter = 1;
-const generateUniqueId = (prefix: string) => `${prefix}_${idCounter++}`;
+const generateUniqueId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${idCounter++}`;
 
 const mockUsers: User[] = [
   { nickname: '멍멍이주인1', email: 'owner1@test.com', password: 'password1' },
@@ -345,11 +354,26 @@ const mockNotifications: Notification[] = [
 
 // 로그인 함수
 export const login = (payload: LoginPayload): Promise<ApiResponse<AuthResult>> => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     setTimeout(() => {
+      // 이메일 존재 여부 확인
+      const userByEmail = mockUsers.find(u => u.email === payload.email);
+      
+      if (!userByEmail) {
+        resolve({
+          isSuccess: false,
+          code: 401,
+          message: '존재하지 않는 이메일입니다.',
+          result: null,
+        });
+        return;
+      }
+      
+      // 비밀번호 확인
       const user = mockUsers.find(
         (u) => u.email === payload.email && u.password === payload.password
       );
+      
       if (user) {
         const authResult: AuthResult = {
           nickname: user.nickname,
@@ -362,10 +386,10 @@ export const login = (payload: LoginPayload): Promise<ApiResponse<AuthResult>> =
           result: authResult,
         });
       } else {
-        reject({
+        resolve({
           isSuccess: false,
           code: 401,
-          message: '이메일 또는 비밀번호가 올바르지 않습니다.',
+          message: '비밀번호가 올바르지 않습니다.',
           result: null,
         });
       }
@@ -501,15 +525,31 @@ export const addPost = (post: Omit<Post, 'id' | 'uploadedAt' | 'userNickname'>, 
   mockPosts.unshift(newPost);
   return newPost;
 };
-// 종 목록 가져오기
+// 종 목록 가져오기 (자동완성용)
 export const getSpeciesList = () => {
   return [
-    '푸들',
     '말티즈',
+    '포메라니안', 
+    '푸들',
     '시바견',
+    '골든리트리버',
+    '래브라도리트리버',
+    '비숑프리제',
+    '치와와',
+    '닥스훈트',
     '믹스견',
     '기타'
   ];
+};
+
+// 품종 자동완성 검색
+export const searchSpecies = (query: string) => {
+  const allSpecies = getSpeciesList();
+  if (query.length < 2) return [];
+  
+  return allSpecies.filter(species => 
+    species.toLowerCase().includes(query.toLowerCase())
+  );
 };
 
 // 색상 목록 가져오기
@@ -719,5 +759,87 @@ export const getNotifications = (): Promise<Notification[]> => {
     setTimeout(() => {
       resolve(sortedNotifications);
     }, 500);
+  });
+};
+
+// 목격 제보 메시지 전송 (시뮬레이션용)
+// 연결된 게시글들 찾기 (위치 업로드 기록이 있는 게시글들)
+export const getConnectedPosts = (postId: string): Post[] => {
+  const connectedPosts: Post[] = [];
+  
+  // 위치 업로드 기록이 있는 채팅방들을 찾아서 연결된 게시글들 수집
+  Object.values(mockChatRooms).forEach(room => {
+    if (room.postId === postId) {
+      // 이 채팅방에서 위치 업로드가 있었는지 확인
+      const messages = mockChatMessages[room.id] || [];
+      const hasLocationUpdate = messages.some(msg => 
+        msg.text && msg.text.includes('위치 정보가 업데이트되었습니다')
+      );
+      
+      if (hasLocationUpdate) {
+        // 연결된 다른 게시글 찾기
+        const otherRooms = Object.values(mockChatRooms).filter(otherRoom => 
+          otherRoom.id !== room.id && 
+          otherRoom.participants.some(participant => 
+            room.participants.includes(participant)
+          )
+        );
+        
+        otherRooms.forEach(otherRoom => {
+          const otherPost = mockPosts.find(p => p.id === otherRoom.postId);
+          if (otherPost && otherPost.id !== postId) {
+            connectedPosts.push(otherPost);
+          }
+        });
+      }
+    }
+  });
+  
+  return connectedPosts;
+};
+
+export const sendWitnessReport = (roomId: string, reportData: {
+  witnessLocation: string;
+  witnessTime: string;
+  witnessDescription: string;
+  witnessImages?: string[];
+}, senderNickname: string): Promise<Message> => {
+  return new Promise((resolve, reject) => {
+    console.log('sendWitnessReport 호출됨:', { roomId, reportData, senderNickname });
+    
+    const room = mockChatRooms.find(r => r.id === roomId);
+    if (!room) {
+      console.log('Room not found:', roomId);
+      reject(new Error('Room not found'));
+      return;
+    }
+
+    const newMessage: Message = {
+      id: generateUniqueId('witness'),
+      senderNickname: senderNickname,
+      time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      type: 'witness_report',
+      text: `📍 목격 제보\n\n위치: ${reportData.witnessLocation}\n시간: ${reportData.witnessTime}\n상세: ${reportData.witnessDescription}`,
+      witnessData: {
+        location: reportData.witnessLocation,
+        time: reportData.witnessTime,
+        description: reportData.witnessDescription,
+        images: reportData.witnessImages || []
+      }
+    };
+
+    console.log('생성된 목격 제보 메시지:', newMessage);
+
+    if (!mockChatMessages[roomId]) {
+      mockChatMessages[roomId] = [];
+    }
+    mockChatMessages[roomId].push(newMessage);
+
+    console.log('저장된 메시지들:', mockChatMessages[roomId]);
+
+    room.lastMessage = '📍 목격 제보가 도착했습니다';
+    room.lastMessageTime = new Date().toISOString();
+
+    resolve(newMessage);
   });
 };

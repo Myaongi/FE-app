@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Dimensions } from 'react-native';
 import Slider from '@react-native-community/slider';
+import React, { useState } from 'react';
+import { Dimensions, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface FilterModalProps {
   visible: boolean;
@@ -94,6 +94,11 @@ const FilterModal: React.FC<FilterModalProps> = ({
         <View style={styles.modalView} onStartShouldSetResponder={() => true}>
           <Text style={styles.modalTitle}>필터</Text>
 
+          <Text style={styles.sectionTitle}>정렬 옵션</Text>
+          <View style={styles.sortOptionsContainer}>
+            <RadioButton label="최신순" value="latest" current={sortBy} onPress={setSortBy} />
+            <RadioButton label="거리순" value="distance" current={sortBy} onPress={setSortBy} disabled={!hasLocation} />
+          </View>
 
           <Text style={[styles.sectionTitle, !hasLocation && styles.disabledLabel]}>위치</Text>
           <Text style={!hasLocation ? styles.hintText : null}>
@@ -125,12 +130,6 @@ const FilterModal: React.FC<FilterModalProps> = ({
             <TimeButton label="1주 이내" value={168} current={time} onPress={setTime} />
             <TimeButton label="1개월 이내" value={720} current={time} onPress={setTime} />
             <TimeButton label="전체" value={'all'} current={time} onPress={setTime} />
-          </View>
-
-          <Text style={styles.sectionTitle}>정렬 옵션</Text>
-          <View style={styles.sortOptionsContainer}>
-            <RadioButton label="최신순" value="latest" current={sortBy} onPress={setSortBy} />
-            <RadioButton label="거리순" value="distance" current={sortBy} onPress={setSortBy} disabled={!hasLocation} />
           </View>
 
           <TouchableOpacity style={styles.applyButton} onPress={handleApply}>

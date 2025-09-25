@@ -1,35 +1,37 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  Image,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Image,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import DropdownIcon from '../assets/images/dropdown.svg';
-import { addPost, getColorList, getSpeciesList, mockGeocode } from '../service/mockApi';
-import MapViewComponent from './MapViewComponent';
+import { addPost, getColorList, getPostById, getSpeciesList, mockGeocode, searchSpecies } from '../service/mockApi';
 import { Post } from '../types';
+import MapViewComponent from './MapViewComponent';
 
 interface WritePostFormProps {
   type: 'lost' | 'witnessed';
   onSubmit: (post: Post) => void;
+  userNickname: string;
+  editMode?: boolean;
+  postId?: string;
 }
 
 const mockAiExtraction = (imageUri: string) => {
   console.log('AI가 사진 특징을 분석합니다...', imageUri);
   return {
     species: '푸들',
-    color: '갈색',
+    color: '',
     gender: '수컷',
   };
 };
@@ -39,7 +41,7 @@ const mockAiImageGeneration = (details: any) => {
   return 'https://via.placeholder.com/300/66ccff/ffffff?text=AI+Generated+Pet';
 };
 
-const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
+const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userNickname, editMode = false, postId }) => {
   const [form, setForm] = useState({
     title: '',
     species: '',
@@ -61,6 +63,9 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
 
   const [showSpeciesPicker, setShowSpeciesPicker] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [speciesQuery, setSpeciesQuery] = useState('');
+  const [speciesSuggestions, setSpeciesSuggestions] = useState<string[]>([]);
+  const [showSpeciesSuggestions, setShowSpeciesSuggestions] = useState(false);
 
   const [mapRegion, setMapRegion] = useState({
     latitude: 37.5665,
@@ -68,6 +73,33 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   });
+
+  useEffect(() => {
+    if (editMode && postId) {
+      const existingPost = getPostById(postId);
+      if (existingPost) {
+        console.log('기존 게시글 데이터 로드:', existingPost);
+        setForm({
+          title: existingPost.title,
+          species: existingPost.species,
+          color: existingPost.color,
+          gender: existingPost.gender,
+          name: existingPost.name,
+          features: existingPost.features,
+          date: new Date(existingPost.date),
+          time: new Date(existingPost.date),
+          location: existingPost.location,
+        });
+        setPhotos(existingPost.photos || []);
+        setMapRegion({
+          latitude: existingPost.latitude,
+          longitude: existingPost.longitude,
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        });
+      }
+    }
+  }, [editMode, postId]);
   const [markerCoordinates, setMarkerCoordinates] = useState<any | null>(null);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -132,12 +164,27 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
 
   const handleSpeciesSelect = (selectedSpecies: string) => {
     setForm(prevForm => ({ ...prevForm, species: selectedSpecies }));
+    setSpeciesQuery(selectedSpecies);
     setShowSpeciesPicker(false);
+    setShowSpeciesSuggestions(false);
   };
 
-  const handleColorSelect = (selectedColor: string) => {
-    setForm(prevForm => ({ ...prevForm, color: selectedColor }));
-    setShowColorPicker(false);
+  const handleSpeciesQueryChange = (query: string) => {
+    setSpeciesQuery(query);
+    setForm(prevForm => ({ ...prevForm, species: query }));
+    
+    if (query.length >= 2) {
+      const suggestions = searchSpecies(query);
+      setSpeciesSuggestions(suggestions);
+      setShowSpeciesSuggestions(suggestions.length > 0);
+    } else {
+      setSpeciesSuggestions([]);
+      setShowSpeciesSuggestions(false);
+    }
+  };
+
+  const handleColorInputChange = (color: string) => {
+    setForm(prevForm => ({ ...prevForm, color }));
   };
 
   const renderDatePicker = () => (
@@ -272,6 +319,7 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
           color: aiFeatures.color,
           gender: aiFeatures.gender,
         }));
+        setSpeciesQuery(aiFeatures.species);
       }
     }
 
@@ -281,14 +329,18 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
   const removePhoto = (index: number) => {
     setPhotos(prevPhotos => prevPhotos.filter((_, i) => i !== index));
     if (photos.length === 1) {
-      setAiImage(null);
       setForm(prevForm => ({
         ...prevForm,
         species: '',
         color: '',
         gender: '',
       }));
+      setSpeciesQuery('');
     }
+  };
+
+  const removeAiImage = () => {
+    setAiImage(null);
   };
 
   const handleAiImageGeneration = () => {
@@ -297,11 +349,12 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
     const details = { ...form, type };
     const generatedImageUri = mockAiImageGeneration(details);
     setAiImage(generatedImageUri);
+    setPhotos([]);
     setAiImageGenerating(false);
   };
 
 
-  const currentUserId = 'user_a';
+  const currentUserId = userNickname;
 
   const handleSubmit = () => {
   // 필수 정보 누락 체크 로직
@@ -364,16 +417,18 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <Text style={styles.sectionDescription}>
-        사진을 올리면 AI가 특징을 자동으로 입력해줘요.
+        사진을 올리면 AI가 품종을 자동으로 입력해줘요.
       </Text>
 
       <View style={styles.imageUploadSection}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageSlotContainer}>
-          <TouchableOpacity style={styles.addPhotoSlot} onPress={handleImagePicker}>
-            <Text style={styles.addPhotoText}>
-              사진 추가{'\n'}({photos.length}/10)
-            </Text>
-          </TouchableOpacity>
+          {!aiImage && (
+            <TouchableOpacity style={styles.addPhotoSlot} onPress={handleImagePicker}>
+              <Text style={styles.addPhotoText}>
+                사진 추가{'\n'}({photos.length}/10)
+              </Text>
+            </TouchableOpacity>
+          )}
           {photos.map((uri, idx) => (
             <View key={idx} style={styles.imageSlot}>
               <Image source={{ uri }} style={styles.uploadedImage} />
@@ -387,7 +442,7 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
 
 
       <View style={styles.formSection}>
-        <TextInput style={styles.input} placeholder="제목" value={form.title} onChangeText={(text) => handleInputChange('title', text)} />
+        <TextInput style={styles.input} placeholder="제목" placeholderTextColor="#666" value={form.title} onChangeText={(text) => handleInputChange('title', text)} />
       </View>
 
       <View style={styles.formSection}>
@@ -396,29 +451,42 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
           <TextInput
             style={styles.input}
             placeholder="반려견 이름"
+            placeholderTextColor="#666"
             value={form.name}
             onChangeText={(text) => handleInputChange('name', text)}
           />
         )}
         <View style={styles.row}>
-          <TouchableOpacity
-            style={styles.halfInputContainer}
-            onPress={() => setShowSpeciesPicker(true)}
-          >
-            <Text style={styles.dropdownPlaceholder}>
-              {form.species || '품종 (AI 자동 입력)'}
-            </Text>
-            <DropdownIcon width={24} height={24} style={styles.dropdownIcon} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.halfInputContainer, { marginLeft: 8 }]}
-            onPress={() => setShowColorPicker(true)}
-          >
-            <Text style={styles.dropdownPlaceholder}>
-              {form.color || '색상 (AI 자동 입력)'}
-            </Text>
-            <DropdownIcon width={24} height={24} style={styles.dropdownIcon} />
-          </TouchableOpacity>
+          <View style={styles.halfInputContainer}>
+            <TextInput
+              style={styles.speciesInput}
+              placeholder="품종 (AI 자동 입력)"
+              placeholderTextColor="#666"
+              value={speciesQuery}
+              onChangeText={handleSpeciesQueryChange}
+              onFocus={() => setShowSpeciesSuggestions(speciesSuggestions.length > 0)}
+            />
+            {showSpeciesSuggestions && (
+              <View style={styles.suggestionsContainer}>
+                {speciesSuggestions.map((suggestion, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.suggestionItem}
+                    onPress={() => handleSpeciesSelect(suggestion)}
+                  >
+                    <Text style={styles.suggestionText}>{suggestion}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+          <TextInput
+            style={[styles.halfInput, { marginLeft: 8 }]}
+            placeholder="색상 (자유 입력)"
+            placeholderTextColor="#666"
+            value={form.color}
+            onChangeText={handleColorInputChange}
+          />
         </View>
 
         <View style={styles.genderContainer}>
@@ -433,6 +501,7 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
         <TextInput
           style={styles.multiLineInput}
           placeholder="기타 성격, 특징, 착용물 등 자세히 작성"
+          placeholderTextColor="#666"
           multiline
           numberOfLines={4}
           value={form.features}
@@ -447,20 +516,27 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
             사진이 없을 경우, 입력한 특징으로 AI 이미지를 생성해드려요.
           </Text>
           {aiImage && (
-            <Image source={{ uri: aiImage }} style={styles.aiGeneratedImage} />
+            <View style={styles.aiImageContainer}>
+              <Image source={{ uri: aiImage }} style={styles.aiGeneratedImage} />
+              <TouchableOpacity style={styles.removeAiImageButton} onPress={removeAiImage}>
+                <Text style={styles.removeAiImageText}>×</Text>
+              </TouchableOpacity>
+            </View>
           )}
-          <TouchableOpacity
-            style={[
-              styles.aiGenerateButton,
-              aiImageGenerating && styles.disabledButton,
-            ]}
-            onPress={handleAiImageGeneration}
-            disabled={aiImageGenerating}
-          >
-            <Text style={styles.aiGenerateButtonText}>
-              {aiImageGenerating ? 'AI 이미지 생성 중...' : '이미지 생성하기'}
-            </Text>
-          </TouchableOpacity>
+          {!aiImage && (
+            <TouchableOpacity
+              style={[
+                styles.aiGenerateButton,
+                aiImageGenerating && styles.disabledButton,
+              ]}
+              onPress={handleAiImageGeneration}
+              disabled={aiImageGenerating}
+            >
+              <Text style={styles.aiGenerateButtonText}>
+                {aiImageGenerating ? 'AI 이미지 생성 중...' : '이미지 생성하기'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -601,16 +677,15 @@ const styles = StyleSheet.create({
   },
   halfInput: {
     flex: 1,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
   },
   halfInputContainer: {
     flex: 1,
     position: 'relative',
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    justifyContent: 'center',
-    paddingLeft: 12,
   },
   dropdownPlaceholder: {
     color: '#888',
@@ -776,6 +851,57 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
     color: '#888',
+  },
+  speciesInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+    flex: 1,
+  },
+  suggestionsContainer: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    maxHeight: 150,
+    zIndex: 1000,
+    elevation: 5,
+  },
+  suggestionItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  suggestionText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  aiImageContainer: {
+    position: 'relative',
+    marginBottom: 12,
+  },
+  removeAiImageButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeAiImageText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
 

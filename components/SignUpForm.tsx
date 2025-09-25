@@ -1,8 +1,6 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import BackIcon from '../assets/images/back.svg';
-import EmailIcon from '../assets/images/email.svg';
-import PwIcon from '../assets/images/pw.svg';
 
 interface SignUpFormProps {
   step: number;
@@ -37,6 +35,9 @@ const SignUpForm = ({
   onClose,
   onSignUp,
 }: SignUpFormProps) => {
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
   const isButtonDisabled = () => {
     switch (step) {
       case 1:
@@ -77,7 +78,10 @@ const SignUpForm = ({
           <>
             <Text style={styles.promptText}>이메일로 시작하기</Text>
             <View style={[styles.inputContainer, getErrorMessage('email') && styles.inputContainerError]}>
-              <EmailIcon width={20} height={20} color="#B0B0B0" style={styles.inputIcon} />
+              <Image 
+                source={(emailFocused || email.trim()) ? require('../assets/images/emon.png') : require('../assets/images/em.png')} 
+                style={styles.inputIcon} 
+              />
               <TextInput
                 style={styles.input}
                 placeholder="이메일"
@@ -86,6 +90,8 @@ const SignUpForm = ({
                 autoCapitalize="none"
                 value={email}
                 onChangeText={setEmail}
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
               />
             </View>
             {getErrorMessage('email') && <Text style={styles.errorText}>{getErrorMessage('email')}</Text>}
@@ -96,7 +102,10 @@ const SignUpForm = ({
           <>
             <Text style={styles.promptText}>비밀번호 설정</Text>
             <View style={[styles.inputContainer, getErrorMessage('password') && styles.inputContainerError]}>
-              <PwIcon width={20} height={20} color="#B0B0B0" style={styles.inputIcon} />
+              <Image 
+                source={(passwordFocused || password.trim()) ? require('../assets/images/pwon.png') : require('../assets/images/pw.png')} 
+                style={styles.inputIcon} 
+              />
               <TextInput
                 style={styles.input}
                 placeholder="비밀번호"
@@ -104,11 +113,16 @@ const SignUpForm = ({
                 secureTextEntry
                 value={password}
                 onChangeText={setPassword}
+                onFocus={() => setPasswordFocused(true)}
+                onBlur={() => setPasswordFocused(false)}
               />
             </View>
             {getErrorMessage('password') && <Text style={styles.errorText}>{getErrorMessage('password')}</Text>}
             <View style={[styles.inputContainer, getErrorMessage('confirmPassword') && styles.inputContainerError]}>
-              <PwIcon width={20} height={20} color="#B0B0B0" style={styles.inputIcon} />
+              <Image 
+                source={(confirmPasswordFocused || confirmPassword.trim()) ? require('../assets/images/pwon.png') : require('../assets/images/pw.png')} 
+                style={styles.inputIcon} 
+              />
               <TextInput
                 style={styles.input}
                 placeholder="비밀번호 확인"
@@ -116,6 +130,8 @@ const SignUpForm = ({
                 secureTextEntry
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
+                onFocus={() => setConfirmPasswordFocused(true)}
+                onBlur={() => setConfirmPasswordFocused(false)}
               />
             </View>
             {getErrorMessage('confirmPassword') && <Text style={styles.errorText}>{getErrorMessage('confirmPassword')}</Text>}
@@ -206,17 +222,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     height: 50,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    paddingHorizontal: 15,
+    backgroundColor: 'transparent',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    paddingHorizontal: 0,
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
   },
   inputContainerError: {
-    borderColor: 'red',
+    borderBottomColor: 'red',
   },
   inputIcon: {
+    width: 20,
+    height: 20,
     marginRight: 10,
   },
   input: {
@@ -227,16 +244,15 @@ const styles = StyleSheet.create({
   inputOnly: {
     width: '100%',
     height: 50,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    paddingHorizontal: 15,
+    backgroundColor: 'transparent',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    paddingHorizontal: 0,
     marginBottom: 10,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
   },
   inputError: {
-    borderColor: 'red',
+    borderBottomColor: 'red',
   },
   errorText: {
     color: 'red',

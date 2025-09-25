@@ -1,19 +1,20 @@
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import BackIcon from '../assets/images/back.svg';
 import WarningIcon from '../assets/images/warning.svg';
+import { getUserName } from '../service/mockApi';
 import { Post, StackNavigation } from '../types';
 import { formatRelativeTime } from '../utils/time';
 import MapViewComponent from './MapViewComponent';
-import { getUserName } from '../service/mockApi';
 
 interface PostDetailContentProps {
   post: Post;
-  children: React.ReactNode; 
+  children: React.ReactNode;
+  isGuest?: boolean;
 }
 
-const PostDetailContent = ({ post, children }: PostDetailContentProps) => {
+const PostDetailContent = ({ post, children, isGuest = false }: PostDetailContentProps) => {
   const navigation = useNavigation<StackNavigation>();
 
   const userName = getUserName(post.userNickname);
@@ -33,29 +34,55 @@ const PostDetailContent = ({ post, children }: PostDetailContentProps) => {
     description: post.locationDetails,
   };
 
+  const handleReportPress = () => {
+    if (isGuest) {
+      Alert.alert(
+        '로그인이 필요합니다',
+        '신고 기능은 로그인이 필요합니다. 로그인 페이지로 이동하시겠습니까?',
+        [
+          { text: '취소', style: 'cancel' },
+          { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
+        ]
+      );
+      return;
+    }
+    
+    navigation.navigate('Report', {
+      postInfo: {
+        userName: userName,
+        title: post.title,
+        location: post.location,
+        time: relativePostTime
+      }
+    });
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.topNavBar}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.navIcon}>
           <BackIcon width={24} height={24} />
         </TouchableOpacity>
-        <View style={styles.userInfoAndStatus}>
-          <View>
-            <Text style={styles.userNameText}>{userName}</Text>
-            <Text style={styles.dateTimeText}>
-              {post.location}
-            </Text>
-            <Text style={styles.dateTimeText}>
-              등록 시간: {relativePostTime}
-            </Text>
-          </View>
+        <View style={styles.userInfo}>
+          <Text style={styles.userNameText}>{userName}</Text>
+          <Text style={styles.dateTimeText}>
+            {post.location}
+          </Text>
+          <Text style={styles.dateTimeText}>
+            등록 시간: {relativePostTime}
+          </Text>
+        </View>
+        <View style={styles.rightSection}>
+                <TouchableOpacity
+                  style={styles.reportButton}
+                  onPress={handleReportPress}
+                >
+            <WarningIcon width={24} height={24} />
+          </TouchableOpacity>
           <View style={styles.statusBadge}>
             <Text style={styles.statusText}>{post.status}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.navIcon}>
-          <WarningIcon width={24} height={24} />
-        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -107,6 +134,7 @@ const PostDetailContent = ({ post, children }: PostDetailContentProps) => {
       </ScrollView>
 
       {children}
+
     </SafeAreaView>
   );
 };
@@ -120,17 +148,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 16,
   },
   navIcon: {
     padding: 8,
   },
-  userInfoAndStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  userInfo: {
     flex: 1,
-    justifyContent: 'space-between',
     marginLeft: 16,
+  },
+  rightSection: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  reportButton: {
+    padding: 8,
   },
   userNameText: {
     fontSize: 16,

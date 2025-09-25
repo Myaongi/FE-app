@@ -1,9 +1,9 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import React from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import PostDetailContent from '../components/PostDetailContent';
 import { getPostById } from '../service/mockApi';
-import { StackNavigation, Post } from '../types';
-import PostDetailContent from '../components/PostDetailContent'; 
+import { Post, StackNavigation } from '../types';
 
 const PostDetailGuestScreen = () => {
   const route = useRoute();
@@ -16,9 +16,12 @@ const PostDetailGuestScreen = () => {
   }, [navigation]);
 
   const fetchPost = React.useCallback(async () => {
+    console.log('fetchPost 호출됨, id:', id);
     const fetchedPost = getPostById(id);
+    console.log('가져온 게시물:', fetchedPost);
     if (fetchedPost) {
       setPost(fetchedPost);
+      console.log('게시물 상태 설정 완료');
     }
   }, [id]);
 
@@ -27,15 +30,18 @@ const PostDetailGuestScreen = () => {
   }, [fetchPost]);
   
   const requireLoginAlert = () => {
+    console.log('requireLoginAlert 호출됨, post type:', post?.type);
+    // 게스트는 모든 기능에 로그인이 필요
     Alert.alert(
-        '로그인이 필요합니다',
-        '해당 기능은 로그인이 필요합니다. 로그인 페이지로 이동하시겠습니까?',
-        [
-          { text: '취소', style: 'cancel' },
-          { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
-        ]
-      );
+      '로그인이 필요합니다',
+      '해당 기능은 로그인이 필요합니다. 로그인 페이지로 이동하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
+      ]
+    );
   };
+
   
   if (!post) {
     return (
@@ -46,7 +52,7 @@ const PostDetailGuestScreen = () => {
   }
 
   return (
-    <PostDetailContent post={post}>
+    <PostDetailContent post={post} isGuest={true}>
       {post.status === '귀가 완료' ? (
         <View style={styles.expiredPostContainer}>
           <Text style={styles.expiredPostText}>이 게시물은 귀가 완료되었습니다.</Text>
@@ -54,7 +60,11 @@ const PostDetailGuestScreen = () => {
       ) : (
         <TouchableOpacity
           style={styles.bottomButton}
-          onPress={requireLoginAlert}
+          onPress={() => {
+            console.log('버튼 클릭됨, post:', post);
+            console.log('post.type:', post?.type);
+            requireLoginAlert();
+          }}
         >
           <Text style={styles.bottomButtonText}>
             {post.type === 'lost' ? '목격했어요' : '1:1 채팅하기'}

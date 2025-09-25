@@ -1,7 +1,6 @@
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
+import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 
 // 네비게이션 타입들
 export type RootTabParamList = {
@@ -15,13 +14,25 @@ export type RootTabParamList = {
 export type RootStackParamList = {
   RootTab: NavigatorScreenParams<RootTabParamList>;
   PostDetail: { id: string; isMyPost?: boolean };
-  WritePostScreen: { type: 'lost' | 'witnessed' };
+  WritePostScreen: { 
+    type: 'lost' | 'witnessed';
+    editMode?: boolean;
+    postId?: string;
+  };
   ChatDetail: { 
     postId: string; 
     chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
     chatRoomId: string;
   };
   NotificationsScreen: undefined;
+  Report: {
+    postInfo: {
+      userName: string;
+      title: string;
+      location: string;
+      time: string;
+    };
+  };
 };
 
 
@@ -140,7 +151,13 @@ export interface Message {
   imageUrl?: string;
   senderNickname: string;
   time: string;
-  type: 'text' | 'image';
+  type: 'text' | 'image' | 'witness_report';
+  witnessData?: {
+    location: string;
+    time: string;
+    description: string;
+    images: string[];
+  };
 }
 
 // 푸시 알림 데이터 타입

@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface LoginFormProps {
   email: string;
@@ -10,6 +10,7 @@ interface LoginFormProps {
   onLogin: () => void;
   onSignUp: () => void;
   onGoBackToGuest: () => void;
+  clearError: () => void;
 }
 
 const LoginForm = ({
@@ -21,37 +22,65 @@ const LoginForm = ({
   onLogin,
   onSignUp,
   onGoBackToGuest,
+  clearError,
 }: LoginFormProps) => {
-  const isEmailError = error === '유효하지 않은 이메일 주소입니다.';
-  const isPasswordError = error === '이메일 또는 비밀번호가 올바르지 않습니다.';
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  
+  const isEmailError = error === '유효하지 않은 이메일 주소입니다.' || error === '존재하지 않는 이메일입니다.';
+  const isPasswordError = error === '비밀번호가 올바르지 않습니다.';
 
   return (
     <View style={styles.container}>
       <Text style={styles.logo}>강아지킴이</Text>
       <Text style={styles.promptText}>강아지킴이에 로그인 해주세요!</Text>
 
-      <TextInput
-        style={[styles.input, isEmailError && styles.inputError]}
-        placeholder="이메일을 입력해주세요."
-        placeholderTextColor="#B0B0B0"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        value={email}
-        onChangeText={setEmail}
-      />
+      <View style={[styles.inputContainer, isEmailError && styles.inputError]}>
+        <Image 
+          source={(emailFocused || email.trim()) ? require('../assets/images/emon.png') : require('../assets/images/em.png')} 
+          style={styles.inputIcon} 
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="이메일을 입력해주세요."
+          placeholderTextColor="#B0B0B0"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          value={email}
+          onChangeText={(text) => {
+            setEmail(text);
+            if (error) clearError();
+          }}
+          onFocus={() => setEmailFocused(true)}
+          onBlur={() => setEmailFocused(false)}
+        />
+      </View>
 
-      {isEmailError && <Text style={styles.errorText}>유효하지 않은 이메일 주소예요</Text>}
+      {isEmailError && <Text style={styles.errorText}>
+        {error === '유효하지 않은 이메일 주소입니다.' ? '유효하지 않은 이메일 주소예요' : '존재하지 않는 이메일이에요'}
+      </Text>}
       
-      <TextInput
-        style={[styles.input, isPasswordError && styles.inputError]}
-        placeholder="비밀번호를 입력해주세요."
-        placeholderTextColor="#B0B0B0"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+      <View style={[styles.inputContainer, isPasswordError && styles.inputError]}>
+        <Image 
+          source={(passwordFocused || password.trim()) ? require('../assets/images/pwon.png') : require('../assets/images/pw.png')} 
+          style={styles.inputIcon} 
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="비밀번호를 입력해주세요."
+          placeholderTextColor="#B0B0B0"
+          secureTextEntry
+          value={password}
+          onChangeText={(text) => {
+            setPassword(text);
+            if (error) clearError();
+          }}
+          onFocus={() => setPasswordFocused(true)}
+          onBlur={() => setPasswordFocused(false)}
+        />
+      </View>
 
-      {isPasswordError && <Text style={styles.errorText}>비밀번호가 일치하지 않아요</Text>}
+      {isPasswordError && <Text style={styles.errorText}>비밀번호가 올바르지 않아요</Text>}
 
       <TouchableOpacity style={styles.loginButton} onPress={onLogin}>
         <Text style={styles.loginButtonText}>로그인</Text>
@@ -89,19 +118,29 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 40,
   },
-  input: {
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     width: '100%',
     height: 50,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    paddingHorizontal: 15,
+    backgroundColor: 'transparent',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    paddingHorizontal: 0,
     marginBottom: 10,
+  },
+  inputIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 10,
+  },
+  input: {
+    flex: 1,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    paddingVertical: 0,
   },
   inputError: {
-    borderColor: 'red',
+    borderBottomColor: 'red',
   },
   errorText: {
     color: 'red',

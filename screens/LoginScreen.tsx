@@ -1,14 +1,14 @@
 // src/screens/LoginScreen.tsx
 
-import React, { useState, useContext, useLayoutEffect } from 'react';
-import { SafeAreaView, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigation, ApiResponse, AuthResult } from '../types';
-import { login } from '../service/mockApi';
-import LoginForm from '../components/LoginForm';
+import React, { useContext, useLayoutEffect, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet } from 'react-native';
 import { AuthContext } from '../App';
-import { setupPushNotifications } from '../utils/pushNotifications'; 
-import AsyncStorage from '@react-native-async-storage/async-storage'; 
+import LoginForm from '../components/LoginForm';
+import { login } from '../service/mockApi';
+import { ApiResponse, AuthResult, StackNavigation } from '../types';
+import { setupPushNotifications } from '../utils/pushNotifications';
 
 const LoginScreen = () => {
   const navigation = useNavigation<StackNavigation>();
@@ -56,12 +56,12 @@ const LoginScreen = () => {
 
         await AsyncStorage.setItem('userNickname', nickname);
 
-        // ✅ 수정된 부분: 푸시 알림 설정 코드를 try-catch로 감싸 에러가 발생해도 로그인 흐름이 중단되지 않도록 합니다.
+        // ✅ 푸시 알림 설정 (에러가 발생해도 로그인은 계속 진행)
         try {
           await setupPushNotifications();
         } catch (pushErr) {
-          console.error("푸시 알림 설정 중 오류가 발생했습니다:", pushErr);
-          // 사용자에게 알림 기능이 제한될 수 있음을 알릴 수 있습니다.
+          // 푸시 알림 설정 실패는 로그인을 중단시키지 않음
+          console.log("푸시 알림 설정을 건너뜁니다:", pushErr);
         }
         
       } else {
@@ -85,6 +85,10 @@ const LoginScreen = () => {
     navigation.navigate('Lost');
   };
 
+  const clearError = () => {
+    setError(null);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView 
@@ -99,7 +103,8 @@ const LoginScreen = () => {
               error={error}
               onLogin={handleLogin}
               onSignUp={handleSignUp}
-              onGoBackToGuest={handleGoBackToGuest} 
+              onGoBackToGuest={handleGoBackToGuest}
+              clearError={clearError}
           />
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -1,23 +1,37 @@
-import React, { useLayoutEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  TouchableOpacity
-} from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import WritePostForm from '../components/WritePostForm';
+import React, { useContext, useLayoutEffect } from 'react';
+import {
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { AuthContext } from '../App';
 import CancelIcon from '../assets/images/cancel.svg';
-import {  Post } from '../types';
+import WritePostForm from '../components/WritePostForm';
+import { Post } from '../types';
 
 const WritePostScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { type } = route.params as { type: 'lost' | 'witnessed' };
+  const { type, editMode, postId } = route.params as { 
+    type: 'lost' | 'witnessed';
+    editMode?: boolean;
+    postId?: string;
+  };
+  const authContext = useContext(AuthContext);
+  const userNickname = authContext?.userNickname || '알 수 없는 사용자';
 
   const handleFormSubmit = (newPost: Post) => {
-    navigation.navigate('PostDetail', { id: newPost.id });
+    // 게시글 작성 후 PostDetailScreen으로 이동하고, 뒤로가기 시 LostScreen으로 가도록 스택 조정
+    navigation.reset({
+      index: 1,
+      routes: [
+        { name: 'RootTab', params: { screen: 'Lost' } },
+        { name: 'PostDetail', params: { id: newPost.id } }
+      ],
+    });
   };
   
   useLayoutEffect(() => {
@@ -35,7 +49,13 @@ const WritePostScreen = () => {
         </Text>
         <View style={{ width: 40 }} />
       </View>
-      <WritePostForm type={type} onSubmit={handleFormSubmit} />
+        <WritePostForm 
+          type={type} 
+          onSubmit={handleFormSubmit} 
+          userNickname={userNickname}
+          editMode={editMode}
+          postId={postId}
+        />
     </SafeAreaView>
   );
 };

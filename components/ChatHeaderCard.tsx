@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface ChatHeaderCardProps {
   title: string;
@@ -10,6 +10,7 @@ interface ChatHeaderCardProps {
   status: '실종' | '목격' | '귀가 완료';
   userPetName?: string;
   chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
+  onPress?: () => void;
 }
 
 const getContextTitle = (context: string) => {
@@ -33,12 +34,13 @@ const ChatHeaderCard: React.FC<ChatHeaderCardProps> = ({
   date,
   status,
   chatContext,
+  onPress,
 }) => {
   const contextTitle = getContextTitle(chatContext);
   const statusBadgeColor = status === '실종' ? '#FDD7E4' : '#D3F9D8';
 
   return (
-    <View style={styles.cardContainer}>
+    <TouchableOpacity style={styles.cardContainer} onPress={onPress} activeOpacity={0.7}>
       <Text style={styles.contextTitle}>{contextTitle}</Text>
       <View style={styles.topSection}>
         <View style={styles.imagePlaceholder} />
@@ -59,7 +61,7 @@ const ChatHeaderCard: React.FC<ChatHeaderCardProps> = ({
           <Text style={styles.infoText}>{date}</Text>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 

@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useCallback, useContext } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, RefreshControl, Alert } from 'react-native';
-import { useNavigation, useFocusEffect, type NavigationProp } from '@react-navigation/native';
-import TopTabs from '../components/TopTabs';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import React, { useCallback, useContext, useState } from 'react';
+import { Alert, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AuthContext } from '../App';
 import AppHeader from '../components/AppHeader';
-import PostCard from '../components/PostCard'; 
+import PostCard from '../components/PostCard';
+import TopTabs from '../components/TopTabs';
 import { getPostsByUserId, getUserName } from '../service/mockApi';
-import { StackNavigation, Post } from '../types';
-import { AuthContext } from '../App'; 
+import { Post, StackNavigation } from '../types';
 
 const MypageScreen = () => {
   const navigation = useNavigation<StackNavigation>();
@@ -89,6 +89,26 @@ const MypageScreen = () => {
     }
   };
 
+  const handleLogout = () => {
+    Alert.alert(
+      '로그아웃',
+      '정말 로그아웃 하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        { 
+          text: '로그아웃', 
+          style: 'destructive',
+          onPress: () => {
+            if (authContext?.signOut) {
+              authContext.signOut();
+              console.log('로그아웃 완료');
+            }
+          }
+        },
+      ]
+    );
+  };
+
   const userName = getUserName(userNickname || ''); 
 
   if (!isLoggedIn) {
@@ -110,7 +130,12 @@ const MypageScreen = () => {
         <Text style={styles.userName}>{userName}</Text>
       </View>
 
-      <Text style={styles.myActivitiesText}>내 활동</Text>
+      <View style={styles.myActivitiesContainer}>
+        <Text style={styles.myActivitiesText}>내 활동</Text>
+        <TouchableOpacity onPress={handleLogout}>
+          <Text style={styles.logoutText}>로그아웃</Text>
+        </TouchableOpacity>
+      </View>
       <TopTabs onSelectTab={setActiveTab} activeTab={activeTab} />
       
       <ScrollView
@@ -158,12 +183,22 @@ const styles = StyleSheet.create({
     borderBottomColor: '#ccc',
     paddingBottom: 8,
   },
-  myActivitiesText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  myActivitiesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 8,
+  },
+  myActivitiesText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  logoutText: {
+    fontSize: 14,
+    color: '#007AFF',
+    textDecorationLine: 'underline',
   },
   postListContainer: {
     paddingTop: 10,
