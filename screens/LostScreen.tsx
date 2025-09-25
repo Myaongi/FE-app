@@ -93,8 +93,7 @@ const LostScreen = () => {
         ]
       );
     } else {
-      navigation.navigate('WritePostScreen', { type: 'lost' }); 
-      setIsWriteModalVisible(false);
+      setIsWriteModalVisible(true);
     }
   };
 
