@@ -48,7 +48,6 @@ const LostScreen = () => {
       setIsFilterModalVisible(false);
       
       const requestAndSaveLocation = async () => {
-        // ✅ 수정된 부분: 위치 권한 요청 로직을 더욱 견고하게 개선
         if (authContext?.isLoggedIn) {
           console.log("로그인 상태: 위치 권한 요청 시작");
           
@@ -119,7 +118,8 @@ const LostScreen = () => {
         ]
       );
     } else {
-      console.log('알림 화면으로 이동');
+-     console.log('알림 화면으로 이동');
++     navigation.navigate('NotificationsScreen');
     }
   };
 

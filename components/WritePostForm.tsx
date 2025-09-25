@@ -720,7 +720,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
   },
   pickerContainer: {
-    backgroundColor: 'white',
+    backgroundColor: '#333',
     borderRadius: 12,
     padding: 16,
     width: '80%',

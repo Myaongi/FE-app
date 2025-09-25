@@ -4,7 +4,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, AppStateStatus, Alert } from 'react-native';
-import { getChatRoomsByUserId, getNewMatchCount } from './service/mockApi';
+import { getChatRoomsByUserId, getNewMatchCount, saveUserLocation } from './service/mockApi';
+import * as Location from 'expo-location'; 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // 화면 컴포넌트들
 import ChatDetailScreen from './screens/ChatDetailScreen';
@@ -16,6 +18,7 @@ import MyPageScreen from './screens/MypageScreen';
 import PostDetailScreen from './screens/PostDetailScreen';
 import SignUpScreen from './screens/SignUpScreen';
 import WritePostScreen from './screens/WritePostScreen';
+import NotificationsScreen from './screens/NotificationsScreen'; 
 
 import PostDetailGuestScreen from './screens/PostDetailGuestScreen';
 
@@ -24,13 +27,13 @@ import ChatIcon from './assets/images/chat.svg';
 import HomeIcon from './assets/images/home.svg';
 import MatchIcon from './assets/images/match.svg';
 import MyPageIcon from './assets/images/mypage.svg';
-import { AuthContextType, PushNotificationData, RootTabParamList } from './types';
+import { AuthContextType, PushNotificationData, RootTabParamList, RootStackParamList, AuthStackParamList } from './types'; // ✅ 모든 타입 임포트
 import { getUserLocation } from './utils/location';
 import { setupPushNotifications } from './utils/pushNotifications';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
-const Stack = createNativeStackNavigator();
-
+const MainStack = createNativeStackNavigator<RootStackParamList>(); 
+const AuthStack = createNativeStackNavigator<AuthStackParamList>(); 
 export const AuthContext = React.createContext<AuthContextType | null>(null);
 export const navigationRef = React.createRef<NavigationContainerRef<any>>();
 
@@ -131,25 +134,26 @@ function RootTabNavigator() {
   );
 }
 
-function AuthStack() {
+function AuthStackScreen() {
     return (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Lost" component={LostScreen} />
-            <Stack.Screen name="PostDetail" component={PostDetailGuestScreen} />
-            <Stack.Screen name="LoginScreen" component={LoginScreen} />
-            <Stack.Screen name="SignUpScreen" component={SignUpScreen} />
-        </Stack.Navigator>
+        <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+            <AuthStack.Screen name="Lost" component={LostScreen} />
+            <AuthStack.Screen name="PostDetail" component={PostDetailGuestScreen} />
+            <AuthStack.Screen name="LoginScreen" component={LoginScreen} />
+            <AuthStack.Screen name="SignUpScreen" component={SignUpScreen} />
+        </AuthStack.Navigator>
     );
 }
 
-function MainAppStack() {
+function MainAppStackScreen() {
     return (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="RootTab" component={RootTabNavigator} />
-            <Stack.Screen name="PostDetail" component={PostDetailScreen} />
-            <Stack.Screen name="WritePostScreen" component={WritePostScreen} />
-            <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
-        </Stack.Navigator>
+        <MainStack.Navigator screenOptions={{ headerShown: false }}>
+            <MainStack.Screen name="RootTab" component={RootTabNavigator} />
+            <MainStack.Screen name="PostDetail" component={PostDetailScreen} />
+            <MainStack.Screen name="WritePostScreen" component={WritePostScreen} />
+            <MainStack.Screen name="ChatDetail" component={ChatDetailScreen} />
+            <MainStack.Screen name="NotificationsScreen" component={NotificationsScreen} />
+        </MainStack.Navigator>
     );
 }
 
@@ -161,6 +165,7 @@ export default function App() {
   const appState = useRef(AppState.currentState);
   const notificationReceivedListener = useRef<Notifications.Subscription | null>(null);
   const notificationResponseListener = useRef<Notifications.Subscription | null>(null);
+  const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   
   const authContext = useMemo(() => ({
     signIn: (nickname: string) => {
@@ -170,6 +175,7 @@ export default function App() {
     isLoggedIn: auth.isLoggedIn,
     userNickname: auth.userNickname,
   }), [auth]);
+
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
@@ -202,11 +208,70 @@ export default function App() {
     };
   }, [auth.isLoggedIn]);
 
+
+  useEffect(() => {
+    const startLocationTracking = async () => {
+      if (locationSubscription.current) {
+        await locationSubscription.current.remove();
+        locationSubscription.current = null;
+      }
+      
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('위치 권한이 없어 위치 추적을 시작할 수 없습니다.');
+        return;
+      }
+      
+      const userNickname = await AsyncStorage.getItem('userNickname');
+
+      if (!userNickname) {
+        console.log('사용자 정보가 없어 위치 추적을 시작할 수 없습니다.');
+        return;
+      }
+      
+      locationSubscription.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 60000, 
+          distanceInterval: 10,
+        },
+        async (location) => {
+          console.log('위치 업데이트 수신:', location.coords);
+          await saveUserLocation(userNickname, {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          });
+          console.log('사용자 위치 정보가 서버에 저장되었습니다.');
+        }
+      );
+      console.log('위치 추적을 시작했습니다.');
+    };
+
+    if (auth.isLoggedIn) {
+      startLocationTracking();
+    } else {
+      if (locationSubscription.current) {
+        locationSubscription.current.remove();
+        locationSubscription.current = null;
+        console.log('위치 추적을 중지했습니다.');
+      }
+    }
+
+    return () => {
+      if (locationSubscription.current) {
+        locationSubscription.current.remove();
+        locationSubscription.current = null;
+        console.log('위치 추적이 정리되었습니다.');
+      }
+    };
+  }, [auth.isLoggedIn]);
+
+
   const handleAppStateChange = async (nextAppState: AppStateStatus) => {
     if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
       console.log('앱이 포그라운드로 전환되었습니다.');
       if (auth.isLoggedIn) {
-        await getUserLocation();
+
         await setupPushNotifications();
       }
     }
@@ -216,7 +281,7 @@ export default function App() {
   return (
     <AuthContext.Provider value={authContext}>
       <NavigationContainer ref={navigationRef}>
-        {auth.isLoggedIn ? <MainAppStack /> : <AuthStack />}
+        {auth.isLoggedIn ? <MainAppStackScreen /> : <AuthStackScreen />}
       </NavigationContainer>
     </AuthContext.Provider>
   );

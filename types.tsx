@@ -1,7 +1,7 @@
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { CompositeScreenProps } from '@react-navigation/native';
+import { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
 
 // 네비게이션 타입들
 export type RootTabParamList = {
@@ -13,7 +13,7 @@ export type RootTabParamList = {
 
 // Stack 네비게이션에 포함될 모든 스크린 목록
 export type RootStackParamList = {
-  RootTab: undefined; 
+  RootTab: NavigatorScreenParams<RootTabParamList>;
   PostDetail: { id: string; isMyPost?: boolean };
   WritePostScreen: { type: 'lost' | 'witnessed' };
   ChatDetail: { 
@@ -21,6 +21,7 @@ export type RootStackParamList = {
     chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
     chatRoomId: string;
   };
+  NotificationsScreen: undefined;
 };
 
 
@@ -142,9 +143,20 @@ export interface Message {
   type: 'text' | 'image';
 }
 
-// 알림 데이터 타입
+// 푸시 알림 데이터 타입
 export type PushNotificationData = {
   type: 'MATCH_FOUND' | 'NEW_CHAT_MESSAGE' | 'WITNESS_REPORT' | 'NEW_POST_NEARBY';
   postId?: string; 
   chatRoomId?: string;
 };
+
+// 알림 목록 데이터 타입
+export interface Notification {
+  id: string;
+  type: 'MATCH_FOUND' | 'WITNESS_REPORT' | 'NEW_POST_NEARBY';
+  title: string;
+  message: string;
+  timestamp: string;
+  thumbnail?: string;
+  postId?: string; 
+}

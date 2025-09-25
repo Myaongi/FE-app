@@ -96,9 +96,13 @@ const ChatScreen = () => {
     });
   };
 
+  const handleAlarmPress = () => {
+    navigation.navigate('NotificationsScreen');
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <AppHeader showFilter={false} />
+      <AppHeader showFilter={false} onAlarmPress={handleAlarmPress} />
       <View style={styles.listWrapper}>
         <ScrollView contentContainerStyle={styles.listContent}>
           {chatList.map((chat) => (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, RefreshControl, Alert } from 'react-native';
+import { useNavigation, useFocusEffect, type NavigationProp } from '@react-navigation/native';
 import TopTabs from '../components/TopTabs';
 import AppHeader from '../components/AppHeader';
 import PostCard from '../components/PostCard'; 
@@ -74,13 +74,27 @@ const MypageScreen = () => {
     </TouchableOpacity>
   );
 
+  const handleAlarmPress = () => {
+    if (!isLoggedIn) {
+      Alert.alert(
+        '로그인이 필요합니다',
+        '알림을 확인하려면 로그인이 필요합니다.',
+        [
+          { text: '취소', style: 'cancel' },
+          { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
+        ]
+      );
+    } else {
+      navigation.navigate('NotificationsScreen');
+    }
+  };
 
   const userName = getUserName(userNickname || ''); 
 
   if (!isLoggedIn) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <AppHeader showFilter={false} />
+        <AppHeader showFilter={false} onAlarmPress={handleAlarmPress} />
         <View style={styles.noPostsContainer}>
           <Text style={styles.noPostsText}>로그인 후 마이페이지를 이용해주세요.</Text>
         </View>
@@ -90,7 +104,7 @@ const MypageScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <AppHeader showFilter={false} />
+      <AppHeader showFilter={false} onAlarmPress={handleAlarmPress} />
 
       <View style={styles.userInfoSection}>
         <Text style={styles.userName}>{userName}</Text>

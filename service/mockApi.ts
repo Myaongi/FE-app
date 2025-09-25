@@ -1,6 +1,6 @@
 import {
   Post, Match, GeocodeResult, ChatRoom, Message,
-  ApiResponse, LoginPayload, SignUpPayload, AuthResult, User
+  ApiResponse, LoginPayload, SignUpPayload, AuthResult, User, Notification
 } from '../types';
 
 let idCounter = 1;
@@ -311,6 +311,37 @@ const mockMatches: Match[] = [
 
 const mockChatRooms: ChatRoom[] = [];
 const mockChatMessages: { [roomId: string]: Message[] } = {};
+
+// ✅ 알림 데이터 추가
+const mockNotifications: Notification[] = [
+  {
+    id: 'notif_1',
+    type: 'NEW_POST_NEARBY',
+    title: '내 근처 새 게시글',
+    message: '근처에 새로운 제보가 올라왔어요. 골든타임이 지나기 전에 함께 찾아주세요🙏',
+    timestamp: new Date().toISOString(),
+    postId: '5',
+    thumbnail: 'https://via.placeholder.com/60',
+  },
+  {
+    id: 'notif_2',
+    type: 'MATCH_FOUND',
+    title: '새로운 매칭',
+    message: '아치와 닮은 아이 소식이 있어요! 확인해볼까요?',
+    timestamp: new Date(Date.now() - 3600000).toISOString(), // 1시간 전
+    postId: '3',
+    thumbnail: 'https://via.placeholder.com/60',
+  },
+  {
+    id: 'notif_3',
+    type: 'WITNESS_REPORT',
+    title: '목격카드 도착',
+    message: '내 게시글에 새 목격카드가 도착했어요. 목격자와 1:1 채팅으로 확인해봐요.',
+    timestamp: new Date(Date.now() - 86400000 * 15).toISOString(), // 15일 전
+    postId: '1',
+    thumbnail: 'https://via.placeholder.com/60',
+  },
+];
 
 // 로그인 함수
 export const login = (payload: LoginPayload): Promise<ApiResponse<AuthResult>> => {
@@ -675,6 +706,18 @@ export const getNewMatchCount = (): Promise<number> => {
     const newMatches = 2;
     setTimeout(() => {
       resolve(newMatches);
+    }, 500);
+  });
+};
+
+// 알림 목록 가져오기
+export const getNotifications = (): Promise<Notification[]> => {
+  return new Promise((resolve) => {
+    const sortedNotifications = [...mockNotifications].sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+    setTimeout(() => {
+      resolve(sortedNotifications);
     }, 500);
   });
 };

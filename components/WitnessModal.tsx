@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TextInput, TouchableOpacity, TouchableWithoutFeedback, FlatList, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, Modal, TextInput, TouchableOpacity, TouchableWithoutFeedback, FlatList, Platform } from 'react-native';
 import MapViewComponent from './MapViewComponent';
 import { mockGeocode } from '../service/mockApi';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -12,8 +12,8 @@ interface WitnessModalProps {
 }
 
 const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit }) => {
-  const [witnessDate, setWitnessDate] = useState('');
-  const [witnessTime, setWitnessTime] = useState('');
+  const [witnessDate, setWitnessDate] = useState(new Date().toLocaleDateString('ko-KR').replace(/\s/g, ''));
+  const [witnessTime, setWitnessTime] = useState(new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }));
   const [witnessLocation, setWitnessLocation] = useState('');
   const [searchResults, setSearchResults] = useState<GeocodeResult[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<{
@@ -28,7 +28,7 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
 
   const onChange = (event: any, selectedValue?: Date) => {
     const currentDate = selectedValue || date;
-    setShow(Platform.OS === 'ios');
+    setShow(false);
     
     if (event.type === 'dismissed') {
       setShow(false);
@@ -41,10 +41,6 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
     } else {
       setDate(currentDate);
       setWitnessTime(currentDate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }));
-    }
-    
-    if (Platform.OS === 'android') {
-      setShow(false);
     }
   };
 
@@ -169,9 +165,9 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
           </TouchableWithoutFeedback>
         </View>
       </TouchableWithoutFeedback>
-
+      
       {show && (
-        <Modal transparent animationType="fade" visible={show} onRequest-Close={() => setShow(false)}>
+        <Modal transparent animationType="fade" visible={show} onRequestClose={() => setShow(false)}>
           <TouchableWithoutFeedback onPressOut={() => setShow(false)}>
             <View style={styles.pickerModalContainer}>
               <View style={styles.pickerContainer}>
@@ -182,11 +178,6 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
                   is24Hour={true}
                   onChange={onChange}
                 />
-                {Platform.OS === 'ios' && (
-                  <TouchableOpacity style={styles.pickerDoneButton} onPress={() => setShow(false)}>
-                    <Text style={styles.pickerDoneText}>완료</Text>
-                  </TouchableOpacity>
-                )}
               </View>
             </View>
           </TouchableWithoutFeedback>
