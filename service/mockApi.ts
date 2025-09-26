@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 import {
   ApiResponse,
   AuthResult,
@@ -12,28 +14,110 @@ import {
   User
 } from '../types';
 
+// 백엔드 API 기본 설정
+const API_BASE_URL = 'http://54.180.54.51:8080/api/auth';
+
+// axios 인스턴스 생성
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// 요청 인터셉터 - 토큰 자동 추가
+apiClient.interceptors.request.use(
+  async (config) => {
+    console.log('🌐 [AXIOS] 요청 전송:', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: `${config.baseURL}${config.url}`,
+      headers: config.headers
+    });
+    
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log('🔑 [AXIOS] 토큰 추가됨');
+      } else {
+        console.log('🔓 [AXIOS] 토큰 없음');
+      }
+    } catch (error) {
+      console.log('🔓 [AXIOS] 토큰 조회 실패:', error);
+    }
+    
+    console.log('📤 [AXIOS] 요청 데이터:', config.data);
+    console.log('📤 [AXIOS] 최종 헤더:', config.headers);
+    return config;
+  },
+  (error) => {
+    console.log('🚨 [AXIOS] 요청 인터셉터 에러:', error);
+    return Promise.reject(error);
+  }
+);
+
+// 응답 인터셉터 - 에러 처리
+apiClient.interceptors.response.use(
+  (response) => {
+    console.log('✅ [AXIOS] 응답 받음:', {
+      status: response.status,
+      statusText: response.statusText,
+      url: response.config.url,
+      data: response.data
+    });
+    return response;
+  },
+  (error) => {
+    console.log('🚨 [AXIOS] 응답 에러:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      url: error.config?.url,
+      data: error.response?.data,
+      message: error.message,
+      request: {
+        url: error.config?.url,
+        method: error.config?.method,
+        data: error.config?.data,
+        headers: error.config?.headers
+      }
+    });
+    
+    if (error.response?.status === 401) {
+      console.log('🔓 [AXIOS] 401 에러 - 토큰 제거');
+      // 토큰 만료 시 자동 로그아웃 처리
+      AsyncStorage.removeItem('accessToken').catch(err => 
+        console.log('🔓 [AXIOS] 토큰 제거 실패:', err)
+      );
+    }
+    return Promise.reject(error);
+  }
+);
+
 let idCounter = 1;
 const generateUniqueId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${idCounter++}`;
 
 const mockUsers: User[] = [
-  { nickname: '멍멍이주인1', email: 'owner1@test.com', password: 'password1' },
-  { nickname: '멍멍이목격1', email: 'witness1@test.com', password: 'password1' },
-  { nickname: '멍멍이주인2', email: 'owner2@test.com', password: 'password2' },
-  { nickname: '멍멍이목격2', email: 'witness2@test.com', password: 'password2' },
-  { nickname: '멍멍이주인3', email: 'owner3@test.com', password: 'password3' },
-  { nickname: '멍멍이목격3', email: 'witness3@test.com', password: 'password3' },
-  { nickname: '멍멍이주인4', email: 'owner4@test.com', password: 'password4' },
-  { nickname: '멍멍이목격4', email: 'witness4@test.com', password: 'password4' },
-  { nickname: '멍멍이주인5', email: 'owner5@test.com', password: 'password5' },
-  { nickname: '멍멍이목격5', email: 'witness5@test.com', password: 'password5' },
-  { nickname: '멍멍이주인6', email: 'owner6@test.com', password: 'password6' },
-  { nickname: '멍멍이목격6', email: 'witness6@test.com', password: 'password6' },
+  { memberName: '멍멍이주인1', email: 'owner1@test.com', password: 'password1' },
+  { memberName: '멍멍이목격1', email: 'witness1@test.com', password: 'password1' },
+  { memberName: '멍멍이주인2', email: 'owner2@test.com', password: 'password2' },
+  { memberName: '멍멍이목격2', email: 'witness2@test.com', password: 'password2' },
+  { memberName: '멍멍이주인3', email: 'owner3@test.com', password: 'password3' },
+  { memberName: '멍멍이목격3', email: 'witness3@test.com', password: 'password3' },
+  { memberName: '멍멍이주인4', email: 'owner4@test.com', password: 'password4' },
+  { memberName: '멍멍이목격4', email: 'witness4@test.com', password: 'password4' },
+  { memberName: '멍멍이주인5', email: 'owner5@test.com', password: 'password5' },
+  { memberName: '멍멍이목격5', email: 'witness5@test.com', password: 'password5' },
+  { memberName: '멍멍이주인6', email: 'owner6@test.com', password: 'password6' },
+  { memberName: '멍멍이목격6', email: 'witness6@test.com', password: 'password6' },
 ];
 
 const mockPosts: Post[] = [
   {
     id: '1',
-    userNickname: '멍멍이주인1',
+    userMemberName: '멍멍이주인1',
     type: 'lost',
     title: '동네에서 강아지를 잃어버렸어요',
     species: '푸들',
@@ -51,7 +135,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '2',
-    userNickname: '멍멍이목격1',
+    userMemberName: '멍멍이목격1',
     type: 'witnessed',
     title: '산책하다가 길 잃은 강아지를 봤어요',
     species: '포메라니안',
@@ -69,7 +153,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '3',
-    userNickname: '멍멍이주인2',
+    userMemberName: '멍멍이주인2',
     type: 'lost',
     title: '우리 아치 어딨어요',
     species: '말티푸',
@@ -87,7 +171,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '4',
-    userNickname: '멍멍이목격2',
+    userMemberName: '멍멍이목격2',
     type: 'witnessed',
     title: '공원에서 혼자 다니는 강아지',
     species: '말티푸',
@@ -105,7 +189,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '5',
-    userNickname: '멍멍이주인3',
+    userMemberName: '멍멍이주인3',
     type: 'lost',
     title: '활발한 시바견이 안 보여요',
     species: '시바견',
@@ -123,7 +207,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '6',
-    userNickname: '멍멍이목격3',
+    userMemberName: '멍멍이목격3',
     type: 'witnessed',
     title: '주변을 배회하는 푸들',
     species: '푸들',
@@ -141,7 +225,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '7',
-    userNickname: '멍멍이주인4',
+    userMemberName: '멍멍이주인4',
     type: 'lost',
     title: '작고 귀여운 푸들 찾아주세요',
     species: '푸들',
@@ -159,7 +243,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '8',
-    userNickname: '멍멍이목격4',
+    userMemberName: '멍멍이목격4',
     type: 'witnessed',
     title: '주인 없는 비숑을 보았습니다',
     species: '비숑',
@@ -177,7 +261,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '9',
-    userNickname: '멍멍이주인5',
+    userMemberName: '멍멍이주인5',
     type: 'lost',
     title: '말티즈를 찾아요',
     species: '말티즈',
@@ -195,7 +279,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '10',
-    userNickname: '멍멍이목격5',
+    userMemberName: '멍멍이목격5',
     type: 'witnessed',
     title: '공원 벤치에 혼자 있는 강아지',
     species: '닥스훈트',
@@ -213,7 +297,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '11',
-    userNickname: '멍멍이주인6',
+    userMemberName: '멍멍이주인6',
     type: 'lost',
     title: '우리 아기 강아지 찾아주세요',
     species: '시바견',
@@ -231,7 +315,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '12',
-    userNickname: '멍멍이목격6',
+    userMemberName: '멍멍이목격6',
     type: 'witnessed',
     title: '겁에 질려있는 작은 강아지 목격',
     species: '치와와',
@@ -353,109 +437,160 @@ const mockNotifications: Notification[] = [
 ];
 
 // 로그인 함수
-export const login = (payload: LoginPayload): Promise<ApiResponse<AuthResult>> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // 이메일 존재 여부 확인
-      const userByEmail = mockUsers.find(u => u.email === payload.email);
-      
-      if (!userByEmail) {
-        resolve({
-          isSuccess: false,
-          code: 401,
-          message: '존재하지 않는 이메일입니다.',
-          result: null,
-        });
-        return;
+export const login = async (payload: LoginPayload): Promise<ApiResponse<AuthResult>> => {
+  try {
+    const response = await apiClient.post('/login', {
+      email: payload.email,
+      password: payload.password,
+    });
+
+    const apiResponse: ApiResponse<AuthResult> = response.data;
+    
+    if (apiResponse.isSuccess) {
+      // 로그인 성공 시 토큰을 AsyncStorage에 저장
+      if (apiResponse.result?.token) {
+        try {
+          await AsyncStorage.setItem('accessToken', apiResponse.result.token);
+        } catch (error) {
+          console.log('토큰 저장 실패:', error);
+        }
       }
-      
-      // 비밀번호 확인
-      const user = mockUsers.find(
-        (u) => u.email === payload.email && u.password === payload.password
-      );
-      
-      if (user) {
-        const authResult: AuthResult = {
-          nickname: user.nickname,
-          token: `mock-token-${user.nickname}`,
-        };
-        resolve({
-          isSuccess: true,
-          code: 200,
-          message: '로그인에 성공하였습니다.',
-          result: authResult,
-        });
-      } else {
-        resolve({
-          isSuccess: false,
-          code: 401,
-          message: '비밀번호가 올바르지 않습니다.',
-          result: null,
-        });
-      }
-    }, 500);
-  });
+      return apiResponse;
+    } else {
+      throw new Error(apiResponse.message);
+    }
+  } catch (error: any) {
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    } else if (error.message) {
+      throw new Error(error.message);
+    } else {
+      throw new Error('로그인 중 오류가 발생했습니다.');
+    }
+  }
 };
 
 // 회원가입 함수
-export const signup = (payload: SignUpPayload): Promise<ApiResponse<null>> => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const existingUserByEmail = mockUsers.find((u) => u.email === payload.email);
-      if (existingUserByEmail) {
-        reject({
-          isSuccess: false,
-          code: 409,
-          message: '이미 존재하는 이메일입니다.',
-          result: null,
-        });
-        return;
-      }
-      
-      const existingUserByNickname = mockUsers.find((u) => u.nickname === payload.memberName);
-      if (existingUserByNickname) {
-        reject({
-          isSuccess: false,
-          code: 409,
-          message: '이미 존재하는 닉네임입니다.',
-          result: null,
-        });
-        return;
-      }
-
-      const newUser: User = {
-        email: payload.email,
-        password: payload.password,
-        nickname: payload.memberName,
-      };
-
-      mockUsers.push(newUser);
-      
-      resolve({
-        isSuccess: true,
-        code: 201,
-        message: '회원가입 성공',
-        result: null,
-      });
-    }, 500);
+export const signup = async (payload: SignUpPayload): Promise<ApiResponse<null>> => {
+  console.log('📝 [SIGNUP] 회원가입 시도 시작:', { 
+    memberName: payload.memberName, 
+    email: payload.email,
+    passwordLength: payload.password?.length
   });
+  
+  try {
+    console.log('🌐 [SIGNUP] API 요청 전송 중...', { url: `${API_BASE_URL}/signup` });
+    
+    // 요청 데이터 구성
+    const requestData = {
+      memberName: payload.memberName,
+      email: payload.email,
+      password: payload.password,
+    };
+    
+    console.log('📤 [SIGNUP] 요청 데이터 상세:', {
+      memberName: requestData.memberName,
+      memberNameType: typeof requestData.memberName,
+      memberNameLength: requestData.memberName?.length,
+      email: requestData.email,
+      emailType: typeof requestData.email,
+      passwordLength: requestData.password?.length,
+      passwordType: typeof requestData.password,
+      전체데이터: requestData
+    });
+    
+    const response = await apiClient.post('/signup', requestData);
+    
+    console.log('✅ [SIGNUP] API 응답 받음:', response.data);
+    console.log('🔍 [SIGNUP] 응답 상태:', response.status);
+    console.log('🔍 [SIGNUP] 응답 헤더:', response.headers);
+    
+    const apiResponse: ApiResponse<null> = response.data;
+    
+    console.log('📊 [SIGNUP] 응답 구조 분석:', {
+      isSuccess: apiResponse.isSuccess,
+      code: apiResponse.code,
+      message: apiResponse.message,
+      result: apiResponse.result
+    });
+    
+    if (apiResponse.isSuccess) {
+      console.log('🎉 [SIGNUP] 회원가입 성공');
+      return apiResponse;
+    } else {
+      console.log('❌ [SIGNUP] 회원가입 실패:', apiResponse.message);
+      throw new Error(apiResponse.message);
+    }
+  } catch (error: any) {
+    console.log('🚨 [SIGNUP] 에러 발생:', error);
+    console.log('🚨 [SIGNUP] 에러 상세:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      config: {
+        url: error.config?.url,
+        method: error.config?.method,
+        data: error.config?.data
+      }
+    });
+    
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    } else if (error.message) {
+      throw new Error(error.message);
+    } else {
+      throw new Error('회원가입 중 오류가 발생했습니다.');
+    }
+  }
+};
+
+// 토큰 리프레시 함수
+export const refreshToken = async (): Promise<ApiResponse<AuthResult>> => {
+  try {
+    const response = await apiClient.post('/refresh');
+
+    const apiResponse: ApiResponse<AuthResult> = response.data;
+    
+    if (apiResponse.isSuccess) {
+      // 새로 받은 토큰을 AsyncStorage에 업데이트
+      if (apiResponse.result?.token) {
+        try {
+          await AsyncStorage.setItem('accessToken', apiResponse.result.token);
+        } catch (error) {
+          console.log('토큰 업데이트 실패:', error);
+        }
+      }
+      return apiResponse;
+    } else {
+      throw new Error(apiResponse.message);
+    }
+  } catch (error: any) {
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    } else if (error.message) {
+      throw new Error(error.message);
+    } else {
+      throw new Error('토큰 갱신 중 오류가 발생했습니다.');
+    }
+  }
 };
 
 //사용자 위치 정보 저장
-export const saveUserLocation = (nickname: string, location: { latitude: number; longitude: number }): Promise<void> => {
+export const saveUserLocation = (memberName: string, location: { latitude: number; longitude: number }): Promise<void> => {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
-      const user = mockUsers.find(u => u.nickname === nickname);
+      const user = mockUsers.find(u => u.memberName === memberName);
       if (user) {
         // 기존 객체에 location 필드를 추가/업데이트
         user.location = location;
-        console.log(`Mock: User ${nickname} location saved:`, location);
+        console.log(`Mock: User ${memberName} location saved:`, location);
         resolve();
       } else {
         // 회원가입으로 새로 추가된 유저일 경우를 대비
-        const newUser: User = { nickname, email: '', location };
+        const newUser: User = { memberName, email: '', location };
         mockUsers.push(newUser);
-        console.log(`Mock: New user ${nickname} created and location saved:`, location);
+        console.log(`Mock: New user ${memberName} created and location saved:`, location);
         resolve();
       }
     }, 500);
@@ -463,20 +598,20 @@ export const saveUserLocation = (nickname: string, location: { latitude: number;
 };
 
 // 푸시 토큰 저장 
-export const savePushToken = (nickname: string, pushToken: string): Promise<void> => {
+export const savePushToken = (memberName: string, pushToken: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
-      const user = mockUsers.find(u => u.nickname === nickname);
+      const user = mockUsers.find(u => u.memberName === memberName);
       if (user) {
         // 기존 mockUsers 배열의 객체에 pushToken 필드를 추가/업데이트
         user.pushToken = pushToken;
-        console.log(`Mock: User ${nickname} push token saved: ${pushToken}`);
+        console.log(`Mock: User ${memberName} push token saved: ${pushToken}`);
         resolve();
       } else {
         // 회원가입으로 새로 추가된 유저일 경우 대비
-        const newUser: User = { nickname, email: '', pushToken };
+        const newUser: User = { memberName, email: '', pushToken };
         mockUsers.push(newUser);
-        console.log(`Mock: New user ${nickname} created and push token saved: ${pushToken}`);
+        console.log(`Mock: New user ${memberName} created and push token saved: ${pushToken}`);
         resolve();
       }
     }, 500);
@@ -508,19 +643,19 @@ export const getPostById = (id: string): Post | undefined => {
 };
 
 // 사용자 닉네임으로 게시글 목록 가져오기
-export const getPostsByUserId = (userNickname: string): Post[] => {
-  return mockPosts.filter(post => post.userNickname === userNickname);
+export const getPostsByUserId = (userMemberName: string): Post[] => {
+  return mockPosts.filter(post => post.userMemberName === userMemberName);
 };
 
 // 새 게시글 추가
-export const addPost = (post: Omit<Post, 'id' | 'uploadedAt' | 'userNickname'>, userNickname: string): Post => {
+export const addPost = (post: Omit<Post, 'id' | 'uploadedAt' | 'userMemberName'>, userMemberName: string): Post => {
   const newPost: Post = {
     ...post,
     id: generateUniqueId('post'),
     uploadedAt: new Date().toISOString(),
     latitude: 37.5665,
     longitude: 126.9780,
-    userNickname: userNickname,
+    userMemberName: userMemberName,
   };
   mockPosts.unshift(newPost);
   return newPost;
@@ -639,10 +774,10 @@ export const updatePostStatus = (postId: string, newStatus: Post['status']): Pro
 };
 
 // 사용자 닉네임으로 채팅방 목록 가져오기
-export const getChatRoomsByUserId = (userNickname: string): Promise<ChatRoom[]> => {
+export const getChatRoomsByUserId = (userMemberName: string): Promise<ChatRoom[]> => {
   return new Promise((resolve) => {
     const userChats = mockChatRooms.filter(room =>
-      room.participants.includes(userNickname)
+      room.participants.includes(userMemberName)
     );
     setTimeout(() => resolve(userChats), 500);
   });
@@ -678,12 +813,12 @@ export const createChatRoom = (
 };
 
 // 채팅방 메시지 읽음 처리
-export const readChatRoom = (roomId: string, userNickname: string): Promise<void> => {
+export const readChatRoom = (roomId: string, userMemberName: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     const roomToUpdate = mockChatRooms.find(room => room.id === roomId);
     if (roomToUpdate) {
-      roomToUpdate.unreadCounts[userNickname] = 0;
-      console.log(`Chat room ${roomId} marked as read for user ${userNickname}.`);
+      roomToUpdate.unreadCounts[userMemberName] = 0;
+      console.log(`Chat room ${roomId} marked as read for user ${userMemberName}.`);
       setTimeout(() => resolve(), 300);
     } else {
       reject(new Error("Chat room not found."));
@@ -700,7 +835,7 @@ export const getMessagesByRoomId = (roomId: string): Promise<Message[]> => {
 };
 
 // 메시지 전송
-export const sendMessage = (roomId: string, messageData: { text?: string, imageUrl?: string }, senderNickname: string): Promise<Message> => {
+export const sendMessage = (roomId: string, messageData: { text?: string, imageUrl?: string }, senderMemberName: string): Promise<Message> => {
   return new Promise((resolve, reject) => {
     const room = mockChatRooms.find(r => r.id === roomId);
     if (!room) {
@@ -710,7 +845,7 @@ export const sendMessage = (roomId: string, messageData: { text?: string, imageU
 
     const newMessage: Message = {
       id: generateUniqueId('msg'),
-      senderNickname: senderNickname,
+      senderMemberName: senderMemberName,
       time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: true }),
       type: messageData.text ? 'text' : 'image',
       text: messageData.text,
@@ -725,9 +860,9 @@ export const sendMessage = (roomId: string, messageData: { text?: string, imageU
     room.lastMessage = messageData.text || '[사진]';
     room.lastMessageTime = new Date().toISOString();
 
-    const otherParticipantNickname = room.participants.find(p => p !== senderNickname);
-    if (otherParticipantNickname && room.unreadCounts[otherParticipantNickname] !== undefined) {
-      room.unreadCounts[otherParticipantNickname]++;
+    const otherParticipantMemberName = room.participants.find(p => p !== senderMemberName);
+    if (otherParticipantMemberName && room.unreadCounts[otherParticipantMemberName] !== undefined) {
+      room.unreadCounts[otherParticipantMemberName]++;
     }
 
     setTimeout(() => resolve(newMessage), 300);
@@ -735,9 +870,9 @@ export const sendMessage = (roomId: string, messageData: { text?: string, imageU
 };
 
 // 사용자 닉네임으로 사용자 이름 가져오기
-export const getUserName = (userNickname: string): string => {
-  const user = mockUsers.find(u => u.nickname === userNickname);
-  return user ? user.nickname : '알 수 없는 사용자';
+export const getUserName = (userMemberName: string): string => {
+  const user = mockUsers.find(u => u.memberName === userMemberName);
+  return user ? user.memberName : '알 수 없는 사용자';
 };
 
 // 새로운 매칭 수 가져오기
@@ -803,9 +938,9 @@ export const sendWitnessReport = (roomId: string, reportData: {
   witnessTime: string;
   witnessDescription: string;
   witnessImages?: string[];
-}, senderNickname: string): Promise<Message> => {
+}, senderMemberName: string): Promise<Message> => {
   return new Promise((resolve, reject) => {
-    console.log('sendWitnessReport 호출됨:', { roomId, reportData, senderNickname });
+    console.log('sendWitnessReport 호출됨:', { roomId, reportData, senderMemberName });
     
     const room = mockChatRooms.find(r => r.id === roomId);
     if (!room) {
@@ -816,7 +951,7 @@ export const sendWitnessReport = (roomId: string, reportData: {
 
     const newMessage: Message = {
       id: generateUniqueId('witness'),
-      senderNickname: senderNickname,
+      senderMemberName: senderMemberName,
       time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: true }),
       type: 'witness_report',
       text: `📍 목격 제보\n\n위치: ${reportData.witnessLocation}\n시간: ${reportData.witnessTime}\n상세: ${reportData.witnessDescription}`,

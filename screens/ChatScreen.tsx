@@ -26,8 +26,8 @@ const ChatScreen = () => {
   
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const authContext = useContext(AuthContext); 
-  const { isLoggedIn, userNickname } = authContext || { isLoggedIn: false, userNickname: null };
-  const currentUserId = userNickname; 
+  const { isLoggedIn, userMemberName } = authContext || { isLoggedIn: false, userMemberName: null };
+  const currentUserId = userMemberName; 
 
   const loadChats = async () => {
 

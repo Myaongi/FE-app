@@ -52,15 +52,15 @@ function RootTabNavigator() {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const authContext = React.useContext(AuthContext);
   
-  const { isLoggedIn, userNickname } = authContext || { isLoggedIn: false, userNickname: null };
+  const { isLoggedIn, userMemberName } = authContext || { isLoggedIn: false, userMemberName: null };
 
   const fetchBadgeCounts = async () => {
-    if (!isLoggedIn || !userNickname) return;
+    if (!isLoggedIn || !userMemberName) return;
     try {
       const newMatches = await getNewMatchCount();
       setMatchCount(newMatches);
-      const chatRooms = await getChatRoomsByUserId(userNickname);
-      const totalUnread = chatRooms.reduce((sum, room) => sum + (room.unreadCounts[userNickname] || 0), 0);
+      const chatRooms = await getChatRoomsByUserId(userMemberName);
+      const totalUnread = chatRooms.reduce((sum, room) => sum + (room.unreadCounts[userMemberName] || 0), 0);
       setUnreadChatCount(totalUnread);
     } catch (error) {
       console.error("Failed to fetch badge counts:", error);
@@ -69,7 +69,7 @@ function RootTabNavigator() {
 
   useEffect(() => {
     fetchBadgeCounts();
-  }, [isLoggedIn, userNickname]);
+  }, [isLoggedIn, userMemberName]);
 
   const handleMatchScreenFocus = useCallback(() => {
     setMatchCount(0);
@@ -159,9 +159,9 @@ function MainAppStackScreen() {
 }
 
 export default function App() {
-  const [auth, setAuth] = useState<{ isLoggedIn: boolean; userNickname: string | null }>({
+  const [auth, setAuth] = useState<{ isLoggedIn: boolean; userMemberName: string | null }>({
     isLoggedIn: false,
-    userNickname: null,
+    userMemberName: null,
   });
   const appState = useRef(AppState.currentState);
   const notificationReceivedListener = useRef<Notifications.Subscription | null>(null);
@@ -169,12 +169,12 @@ export default function App() {
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   
   const authContext = useMemo(() => ({
-    signIn: (nickname: string) => {
-      setAuth({ isLoggedIn: true, userNickname: nickname });
+    signIn: (memberName: string) => {
+      setAuth({ isLoggedIn: true, userMemberName: memberName });
     },
-    signOut: () => setAuth({ isLoggedIn: false, userNickname: null }),
+    signOut: () => setAuth({ isLoggedIn: false, userMemberName: null }),
     isLoggedIn: auth.isLoggedIn,
-    userNickname: auth.userNickname,
+    userMemberName: auth.userMemberName,
   }), [auth]);
 
 
@@ -223,9 +223,9 @@ export default function App() {
         return;
       }
       
-      const userNickname = await AsyncStorage.getItem('userNickname');
+      const userMemberName = await AsyncStorage.getItem('userMemberName');
 
-      if (!userNickname) {
+      if (!userMemberName) {
         console.log('사용자 정보가 없어 위치 추적을 시작할 수 없습니다.');
         return;
       }
@@ -238,7 +238,7 @@ export default function App() {
         },
         async (location) => {
           console.log('위치 업데이트 수신:', location.coords);
-          await saveUserLocation(userNickname, {
+          await saveUserLocation(userMemberName, {
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
           });

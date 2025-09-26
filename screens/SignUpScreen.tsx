@@ -1,9 +1,9 @@
-import React, { useState, useLayoutEffect } from 'react';
-import { SafeAreaView, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigation } from '../types';
-import { signup } from '../service/mockApi';
+import React, { useLayoutEffect, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet } from 'react-native';
 import SignUpForm from '../components/SignUpForm';
+import { signup } from '../service/mockApi';
+import { StackNavigation } from '../types';
 
 const SignUpScreen = () => {
   const navigation = useNavigation<StackNavigation>();
@@ -53,23 +53,34 @@ const SignUpScreen = () => {
   };
 
   const handleSignUp = async () => {
+    console.log('📝 [SIGNUP SCREEN] 회원가입 버튼 클릭됨');
+    
     if (memberName.length < 2 || memberName.length > 10) {
+      console.log('❌ [SIGNUP SCREEN] 닉네임 길이 검증 실패:', memberName.length);
       setError('닉네임은 2자 이상 10자 이하여야 합니다.');
       return;
     }
     
+    console.log('✅ [SIGNUP SCREEN] 입력 데이터 검증 통과:', { memberName, email });
     setError(null);
 
     try {
+      console.log('🚀 [SIGNUP SCREEN] signup 함수 호출 시작');
       const response = await signup({ memberName, email, password });
       
+      console.log('📨 [SIGNUP SCREEN] signup 함수 응답 받음:', response);
+      
       if (response.isSuccess) {
+        console.log('🎉 [SIGNUP SCREEN] 회원가입 성공, 알림 표시');
         Alert.alert('회원가입 성공', '로그인 화면으로 이동합니다.');
         navigation.goBack();
       } else {
+        console.log('❌ [SIGNUP SCREEN] 회원가입 실패:', response.message);
         setError(response.message);
       }
     } catch (err: any) {
+      console.log('🚨 [SIGNUP SCREEN] 에러 발생:', err);
+      console.log('🚨 [SIGNUP SCREEN] 에러 메시지:', err.message);
       const message = err.message || '회원가입 중 오류가 발생했습니다. 다시 시도해주세요.';
       setError(message);
     }

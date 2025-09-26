@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback, useContext } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, RefreshControl, Alert } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp } from '@react-navigation/native';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
+import { Alert, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AuthContext } from '../App';
 import MatchCard from '../components/MatchCard';
-import { getMatchesForPost, getPostById, createChatRoom } from '../service/mockApi';
-import { RootStackParamList, Match, Post } from '../types';
-import { AuthContext } from '../App'; 
+import { createChatRoom, getMatchesForPost, getPostById } from '../service/mockApi';
+import { Match, Post, RootStackParamList } from '../types';
 
 const MatchScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -12,8 +12,8 @@ const MatchScreen = () => {
   const { postId } = (route.params || { postId: '1' }) as { postId: string };
 
   const authContext = useContext(AuthContext); 
-  const { isLoggedIn, userNickname } = authContext || { isLoggedIn: false, userNickname: null };
-  const currentUserId = userNickname; 
+  const { isLoggedIn, userMemberName } = authContext || { isLoggedIn: false, userMemberName: null };
+  const currentUserId = userMemberName; 
 
   const [matches, setMatches] = useState<Match[]>([]);
   const [userPost, setUserPost] = useState<Post | null>(null);
@@ -65,7 +65,7 @@ const MatchScreen = () => {
 
     const newRoom = await createChatRoom(
       matchedPostId,
-      [currentUserId, matchedPost.userNickname], 
+      [currentUserId, matchedPost.userMemberName], 
       'match'
     );
     

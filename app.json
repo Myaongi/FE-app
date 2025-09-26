@@ -27,10 +27,6 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.petfinderapp"
     },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
     "plugins": [
       [
         "expo-splash-screen",

@@ -7,7 +7,7 @@ import { Alert, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet } from 
 import { AuthContext } from '../App';
 import LoginForm from '../components/LoginForm';
 import { login } from '../service/mockApi';
-import { ApiResponse, AuthResult, StackNavigation } from '../types';
+import { ApiResponse, StackNavigation } from '../types';
 import { setupPushNotifications } from '../utils/pushNotifications';
 
 const LoginScreen = () => {
@@ -35,39 +35,76 @@ const LoginScreen = () => {
   };
 
   const handleLogin = async () => {
+    console.log('🔐 [LOGIN SCREEN] 로그인 버튼 클릭됨');
+    
     if (!email || !password) {
+      console.log('❌ [LOGIN SCREEN] 입력값 검증 실패: 이메일 또는 비밀번호 누락');
       setError('이메일과 비밀번호를 모두 입력해주세요.');
       return;
     }
     if (!isValidEmail(email)) {
+      console.log('❌ [LOGIN SCREEN] 이메일 형식 검증 실패:', email);
       setError('유효하지 않은 이메일 주소입니다.');
       return;
     }
 
+    console.log('✅ [LOGIN SCREEN] 입력 데이터 검증 통과:', { email });
     setError(null);
 
     try {
-      const response: ApiResponse<AuthResult> = await login({ email, password });
+      console.log('🚀 [LOGIN SCREEN] login 함수 호출 시작');
+      const response: ApiResponse<any> = await login({ email, password });
+      
+      console.log('📨 [LOGIN SCREEN] login 함수 응답 받음:', response);
       
       if (response.isSuccess) {
-        const { nickname } = response.result;
+        console.log('🎉 [LOGIN SCREEN] 로그인 성공, 사용자 정보 설정 중');
+        console.log('📊 [LOGIN SCREEN] 응답 데이터 상세:', response.result);
+        console.log('🔍 [LOGIN SCREEN] result 타입:', typeof response.result);
+        console.log('🔍 [LOGIN SCREEN] result 키들:', response.result ? Object.keys(response.result) : 'result가 null/undefined');
+        
+        // 백엔드 응답 구조에 따라 사용자 정보 추출
+        let memberName = null;
+        if (response.result && typeof response.result === 'object') {
+          // result 객체 안에서 memberName 찾기
+          memberName = response.result.memberName || response.result.nickname || response.result.username || response.result.name;
+        }
+        
+        console.log('👤 [LOGIN SCREEN] 추출된 사용자명:', memberName);
 
-        signIn(nickname);
+        if (memberName) {
+          signIn(memberName);
+          console.log('👤 [LOGIN SCREEN] 사용자 로그인 상태 설정 완료:', memberName);
 
-        await AsyncStorage.setItem('userNickname', nickname);
+          await AsyncStorage.setItem('userMemberName', memberName);
+          console.log('💾 [LOGIN SCREEN] 사용자 정보 저장 완료');
+        } else {
+          console.log('❌ [LOGIN SCREEN] 사용자명을 찾을 수 없습니다. 응답 구조:', response.result);
+          setError('로그인 응답에 사용자 정보가 없습니다.');
+          return;
+        }
 
         // ✅ 푸시 알림 설정 (에러가 발생해도 로그인은 계속 진행)
         try {
+          console.log('🔔 [LOGIN SCREEN] 푸시 알림 설정 시작');
           await setupPushNotifications();
+          console.log('🔔 [LOGIN SCREEN] 푸시 알림 설정 완료');
         } catch (pushErr) {
           // 푸시 알림 설정 실패는 로그인을 중단시키지 않음
-          console.log("푸시 알림 설정을 건너뜁니다:", pushErr);
+          console.log("🔔 [LOGIN SCREEN] 푸시 알림 설정을 건너뜁니다:", pushErr);
         }
         
       } else {
+        console.log('❌ [LOGIN SCREEN] 로그인 실패:', response.message);
         setError(response.message);
       }
     } catch (err: any) {
+      console.log('🚨 [LOGIN SCREEN] 에러 발생:', err);
+      console.log('🚨 [LOGIN SCREEN] 에러 상세:', {
+        message: err.message,
+        stack: err.stack
+      });
+      
       if (err && err.message) {
            setError(err.message);
       } else {

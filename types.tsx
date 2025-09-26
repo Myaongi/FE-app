@@ -53,7 +53,7 @@ export type MatchScreenProps = CompositeScreenProps<
 
 export interface ApiResponse<T> {
   isSuccess: boolean;
-  code: number;
+  code: string;
   message: string;
   result: T;
 }
@@ -71,19 +71,19 @@ export interface SignUpPayload {
 
 export interface AuthContextType {
   isLoggedIn: boolean;
-  userNickname: string | null;
-  signIn: (nickname: string) => void;
+  userMemberName: string | null;
+  signIn: (memberName: string) => void;
   signOut: () => void;
 }
 
 export interface AuthResult {
-  nickname: string;
+  memberName: string;
   token: string;
 }
 
 export interface User {
   email: string;
-  nickname: string;
+  memberName: string;
   password?: string;
   location?: {
     latitude: number;
@@ -109,7 +109,7 @@ export interface Post {
   uploadedAt: string;
   latitude: number;
   longitude: number;
-  userNickname: string;
+  userMemberName: string;
 }
 
 // 매칭 관련 타입
@@ -149,7 +149,7 @@ export interface Message {
   id: string;
   text?: string;
   imageUrl?: string;
-  senderNickname: string;
+  senderMemberName: string;
   time: string;
   type: 'text' | 'image' | 'witness_report';
   witnessData?: {

@@ -17,7 +17,7 @@ interface PostDetailContentProps {
 const PostDetailContent = ({ post, children, isGuest = false }: PostDetailContentProps) => {
   const navigation = useNavigation<StackNavigation>();
 
-  const userName = getUserName(post.userNickname);
+  const userName = getUserName(post.userMemberName);
   const relativePostTime = formatRelativeTime(post.uploadedAt);
 
   const initialMapRegion = {

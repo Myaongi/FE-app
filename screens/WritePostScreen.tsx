@@ -21,7 +21,7 @@ const WritePostScreen = () => {
     postId?: string;
   };
   const authContext = useContext(AuthContext);
-  const userNickname = authContext?.userNickname || '알 수 없는 사용자';
+  const userMemberName = authContext?.userMemberName || '알 수 없는 사용자';
 
   const handleFormSubmit = (newPost: Post) => {
     // 게시글 작성 후 PostDetailScreen으로 이동하고, 뒤로가기 시 LostScreen으로 가도록 스택 조정
@@ -52,7 +52,7 @@ const WritePostScreen = () => {
         <WritePostForm 
           type={type} 
           onSubmit={handleFormSubmit} 
-          userNickname={userNickname}
+          userMemberName={userMemberName}
           editMode={editMode}
           postId={postId}
         />

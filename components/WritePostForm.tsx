@@ -22,7 +22,7 @@ import MapViewComponent from './MapViewComponent';
 interface WritePostFormProps {
   type: 'lost' | 'witnessed';
   onSubmit: (post: Post) => void;
-  userNickname: string;
+  userMemberName: string;
   editMode?: boolean;
   postId?: string;
 }
@@ -41,7 +41,7 @@ const mockAiImageGeneration = (details: any) => {
   return 'https://via.placeholder.com/300/66ccff/ffffff?text=AI+Generated+Pet';
 };
 
-const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userNickname, editMode = false, postId }) => {
+const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMemberName, editMode = false, postId }) => {
   const [form, setForm] = useState({
     title: '',
     species: '',
@@ -354,7 +354,7 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userNickn
   };
 
 
-  const currentUserId = userNickname;
+  const currentUserId = userMemberName;
 
   const handleSubmit = () => {
   // 필수 정보 누락 체크 로직

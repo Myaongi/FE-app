@@ -3,10 +3,10 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useContext, useRef, useState } from 'react';
 import { Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
 import { AuthContext } from '../App';
 import BackIcon from '../assets/images/back.svg';
 import ChatHeaderCard from '../components/ChatHeaderCard';
+import { getMapComponents } from '../components/MapComponents';
 import { getChatRoomById, getMessagesByRoomId, getPostById, getPostsByUserId, getUserName, sendMessage } from '../service/mockApi';
 import { ChatRoom, Message, Post, RootStackParamList, StackNavigation } from '../types';
 
@@ -17,8 +17,8 @@ const ChatDetailScreen = () => {
   const navigation = useNavigation<StackNavigation>();
   const authContext = useContext(AuthContext);
 
-  const { isLoggedIn, userNickname } = authContext || { isLoggedIn: false, userNickname: null };
-  const currentUserId = userNickname;
+  const { isLoggedIn, userMemberName } = authContext || { isLoggedIn: false, userMemberName: null };
+  const currentUserId = userMemberName;
 
   const flatListRef = useRef<FlatList>(null);
   
@@ -228,11 +228,11 @@ const ChatDetailScreen = () => {
         />
         
         {(() => {
-          const myLostPosts = userPosts?.filter(p => p.type === 'lost' && p.userNickname === currentUserId) || [];
+          const myLostPosts = userPosts?.filter(p => p.type === 'lost' && p.userMemberName === currentUserId) || [];
           const hasMyLostPost = myLostPosts.length > 0;
           
           console.log('위치 업로드 조건 체크:', {
-            post: post ? { type: post.type, userNickname: post.userNickname } : null,
+            post: post ? { type: post.type, userMemberName: post.userMemberName } : null,
             currentUserId,
             chatContext,
             myLostPosts: myLostPosts.length,
@@ -313,40 +313,54 @@ const ChatDetailScreen = () => {
           </View>
           
           <View style={styles.mapContainer}>
-            <MapView
-              style={styles.map}
-              initialRegion={{
-                latitude: post?.latitude || 37.5665,
-                longitude: post?.longitude || 126.9780,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              }}
-              onPress={(event) => {
-                const { latitude, longitude } = event.nativeEvent.coordinate;
-                setNewLocation({ latitude, longitude });
-              }}
-            >
-              {post && (
-                <Marker
-                  coordinate={{
-                    latitude: post.latitude,
-                    longitude: post.longitude,
-                  }}
-                  title="기존 위치"
-                  description={post.location}
-                  pinColor="red"
-                />
-              )}
+            {(() => {
+              const { MapView: MapViewComponent, Marker: MarkerComponent } = getMapComponents();
               
-              {newLocation && (
-                <Marker
-                  coordinate={newLocation}
-                  title="새로운 위치"
-                  description="업데이트할 위치"
-                  pinColor="blue"
-                />
-              )}
-            </MapView>
+              if (MapViewComponent && MarkerComponent) {
+                return (
+                  <MapViewComponent
+                    style={styles.map}
+                    initialRegion={{
+                      latitude: post?.latitude || 37.5665,
+                      longitude: post?.longitude || 126.9780,
+                      latitudeDelta: 0.01,
+                      longitudeDelta: 0.01,
+                    }}
+                    onPress={(event: any) => {
+                      const { latitude, longitude } = event.nativeEvent.coordinate;
+                      setNewLocation({ latitude, longitude });
+                    }}
+                  >
+                    {post && (
+                      <MarkerComponent
+                        coordinate={{
+                          latitude: post.latitude,
+                          longitude: post.longitude,
+                        }}
+                        title="기존 위치"
+                        description={post.location}
+                        pinColor="red"
+                      />
+                    )}
+                    
+                    {newLocation && (
+                      <MarkerComponent
+                        coordinate={newLocation}
+                        title="새로운 위치"
+                        description="업데이트할 위치"
+                        pinColor="blue"
+                      />
+                    )}
+                  </MapViewComponent>
+                );
+              }
+              
+              return (
+                <View style={[styles.map, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+                  <Text>지도는 모바일에서만 지원됩니다</Text>
+                </View>
+              );
+            })()}
           </View>
           
           <View style={styles.modalFooter}>

@@ -11,28 +11,28 @@ import { Post, StackNavigation } from '../types';
 const MypageScreen = () => {
   const navigation = useNavigation<StackNavigation>();
   const authContext = useContext(AuthContext); 
-  const { isLoggedIn, userNickname } = authContext || { isLoggedIn: false, userNickname: null };
+  const { isLoggedIn, userMemberName } = authContext || { isLoggedIn: false, userMemberName: null };
 
   const [activeTab, setActiveTab] = useState<'lost' | 'witnessed'>('witnessed');
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchPosts = useCallback(async () => {
-    if (!isLoggedIn || !userNickname) {
+    if (!isLoggedIn || !userMemberName) {
       setIsLoading(false);
       return;
     }
     
     setIsLoading(true);
     try {
-      const fetchedPosts = await getPostsByUserId(userNickname);
+      const fetchedPosts = await getPostsByUserId(userMemberName);
       setUserPosts(fetchedPosts);
     } catch (error) {
       console.error("Failed to fetch user posts:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [isLoggedIn, userNickname]); 
+  }, [isLoggedIn, userMemberName]); 
 
   useFocusEffect(
     useCallback(() => {
@@ -109,7 +109,7 @@ const MypageScreen = () => {
     );
   };
 
-  const userName = getUserName(userNickname || ''); 
+  const userName = getUserName(userMemberName || ''); 
 
   if (!isLoggedIn) {
     return (

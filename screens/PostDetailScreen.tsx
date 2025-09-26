@@ -16,8 +16,8 @@ const PostDetailScreen = () => {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const authContext = useContext(AuthContext);
-  const { isLoggedIn, userNickname } = authContext || { isLoggedIn: false, userNickname: null };
-  const currentUserId = userNickname;
+  const { isLoggedIn, userMemberName } = authContext || { isLoggedIn: false, userMemberName: null };
+  const currentUserId = userMemberName;
 
   React.useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
@@ -96,7 +96,7 @@ const PostDetailScreen = () => {
 
     if (!post) return;
 
-    const otherUserNickname = post.userNickname;
+    const otherUserNickname = post.userMemberName;
     const allChatRooms = await getChatRoomsByUserId(currentUserId);
 
     const existingRoom = allChatRooms.find(
@@ -137,7 +137,7 @@ const PostDetailScreen = () => {
     
     try {
       // 채팅방 생성
-      const otherUserNickname = post!.userNickname;
+      const otherUserNickname = post!.userMemberName;
       const chatRoom = await createChatRoom(
         post!.id,
         [currentUserId || '목격자', otherUserNickname],
@@ -178,7 +178,7 @@ const PostDetailScreen = () => {
     );
   }
 
-  const isMyPost = post.userNickname === userNickname;
+  const isMyPost = post.userMemberName === userMemberName;
 
   return (
     <PostDetailContent post={post}>
