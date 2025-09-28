@@ -169,7 +169,6 @@ const PostDetailScreen = () => {
     }
   };
 
-
   if (!post) {
     return (
       <View style={styles.loadingContainer}>
@@ -181,82 +180,147 @@ const PostDetailScreen = () => {
   const isMyPost = post.userMemberName === userMemberName;
 
   return (
-    <PostDetailContent post={post}>
-      {post.status === '귀가 완료' ? (
-        <View style={styles.expiredPostContainer}>
-          <Text style={styles.expiredPostText}>이 게시물은 귀가 완료되었습니다.</Text>
-        </View>
-      ) : isMyPost && (post.status === '실종' || post.status === '목격') ? (
-        <View style={styles.myPostButtonsContainer}>
+    <View style={styles.container}>
+      {/* 게시글 타입 표시 컨테이너 */}
+      <View style={styles.postTypeContainer}>
+        <Text style={styles.postTypeText}>
+          {post.type === 'lost' ? '잃어버렸어요' : '발견했어요'}
+        </Text>
+        {isMyPost && (
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              onPress={() => {
+                // 수정 기능 - 추후 백엔드 연동 시 구현
+                console.log('게시글 수정');
+              }}
+            >
+              <Text style={styles.actionButtonText}>수정</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                // 삭제 기능 - 추후 백엔드 연동 시 구현
+                console.log('게시글 삭제');
+              }}
+            >
+              <Text style={[styles.actionButtonText, styles.deleteButtonText]}>삭제</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+      
+      <PostDetailContent post={post}>
+        {post.status === '귀가 완료' ? (
+          <View style={styles.expiredPostContainer}>
+            <Text style={styles.expiredPostText}>이 게시물은 귀가 완료되었습니다.</Text>
+          </View>
+        ) : isMyPost && (post.status === '실종' || post.status === '목격') ? (
+          <View style={styles.myPostButtonsContainer}>
+            <TouchableOpacity
+              style={[styles.bottomButton, styles.editButton]}
+              onPress={() => {
+                console.log('게시글 수정하기:', post.id);
+                navigation.navigate('WritePostScreen', { 
+                  type: post.type,
+                  editMode: true,
+                  postId: post.id 
+                });
+              }}
+            >
+              <Text style={styles.bottomButtonText}>수정하기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.bottomButton, styles.completeButton]}
+              onPress={handleCompleteReturn}
+            >
+              <Text style={styles.bottomButtonText}>귀가 완료로 바꾸기</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
           <TouchableOpacity
-            style={[styles.bottomButton, styles.editButton]}
-            onPress={() => {
-              console.log('게시글 수정하기:', post.id);
-              navigation.navigate('WritePostScreen', { 
-                type: post.type,
-                editMode: true,
-                postId: post.id 
-              });
+            style={styles.bottomButton}
+            onPress={async () => {
+              if (post.type === 'lost') {
+                if (!isLoggedIn) {
+                  Alert.alert(
+                    '로그인이 필요합니다',
+                    '목격 정보를 남기려면 로그인이 필요합니다.',
+                    [
+                      { text: '취소', style: 'cancel' },
+                      { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
+                    ]
+                  );
+                } else {
+                  setIsModalVisible(true);
+                }
+              } else if (post.type === 'witnessed') {
+                if (!isLoggedIn) {
+                  Alert.alert(
+                    '로그인이 필요합니다',
+                    '1:1 채팅을 하려면 로그인이 필요합니다.',
+                    [
+                      { text: '취소', style: 'cancel' },
+                      { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
+                    ]
+                  );
+                } else {
+                  await navigateToChat('witnessedPostReport');
+                }
+              }
             }}
           >
-            <Text style={styles.bottomButtonText}>수정하기</Text>
+            <Text style={styles.bottomButtonText}>
+              {post.type === 'lost' ? '목격했어요' : '1:1 채팅하기'}
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.bottomButton, styles.completeButton]}
-            onPress={handleCompleteReturn}
-          >
-            <Text style={styles.bottomButtonText}>귀가 완료로 바꾸기</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <TouchableOpacity
-          style={styles.bottomButton}
-          onPress={async () => {
-            if (post.type === 'lost') {
-              if (!isLoggedIn) {
-                Alert.alert(
-                  '로그인이 필요합니다',
-                  '목격 정보를 남기려면 로그인이 필요합니다.',
-                  [
-                    { text: '취소', style: 'cancel' },
-                    { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
-                  ]
-                );
-              } else {
-                setIsModalVisible(true);
-              }
-            } else if (post.type === 'witnessed') {
-              if (!isLoggedIn) {
-                Alert.alert(
-                  '로그인이 필요합니다',
-                  '1:1 채팅을 하려면 로그인이 필요합니다.',
-                  [
-                    { text: '취소', style: 'cancel' },
-                    { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
-                  ]
-                );
-              } else {
-                await navigateToChat('witnessedPostReport');
-              }
-            }
-          }}
-        >
-          <Text style={styles.bottomButtonText}>
-            {post.type === 'lost' ? '목격했어요' : '1:1 채팅하기'}
-          </Text>
-        </TouchableOpacity>
-      )}
+        )}
+      </PostDetailContent>
 
       <WitnessModal
         visible={isModalVisible}
         onClose={() => setIsModalVisible(false)}
         onSubmit={handleWitnessSubmit}
       />
-    </PostDetailContent>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  postTypeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center', 
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#fff', 
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+    marginTop: 40, 
+  },
+  postTypeText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  actionButtons: {
+    position: 'absolute',
+    right: 20,
+    flexDirection: 'row',
+    gap: 15,
+  },
+  actionButtonText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '500',
+    textDecorationLine: 'underline',
+  },
+  deleteButtonText: {
+    color: '#FF3B30',
+    textDecorationLine: 'underline',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -295,6 +359,7 @@ const styles = StyleSheet.create({
   // 내 게시글 버튼 컨테이너
   myPostButtonsContainer: {
     position: 'absolute',
+    top: 100,
     bottom: 20,
     left: 20,
     right: 20,

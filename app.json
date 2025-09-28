@@ -14,7 +14,10 @@
         "NSPhotoLibraryUsageDescription": "반려동물 사진을 업로드하려면 사진첩 접근 권한이 필요합니다.",
         "NSCameraUsageDescription": "반려동물 사진을 찍으려면 카메라 접근 권한이 필요합니다."
       },
-      "bundleIdentifier": "com.anonymous.pet-finder-app"
+      "bundleIdentifier": "com.anonymous.pet-finder-app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyB41Gt3aQ57cQ3NuOWfIkFmnjKkpO6RNVU"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -25,7 +28,12 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.petfinderapp"
+      "package": "com.anonymous.petfinderapp",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyB41Gt3aQ57cQ3NuOWfIkFmnjKkpO6RNVU"
+        }
+      }
     },
     "plugins": [
       [

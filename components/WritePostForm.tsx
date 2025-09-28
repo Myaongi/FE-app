@@ -3,17 +3,17 @@ import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Image,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { addPost, getColorList, getPostById, getSpeciesList, mockGeocode, searchSpecies } from '../service/mockApi';
 import { Post } from '../types';
@@ -80,15 +80,15 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
       if (existingPost) {
         console.log('기존 게시글 데이터 로드:', existingPost);
         setForm({
-          title: existingPost.title,
-          species: existingPost.species,
-          color: existingPost.color,
-          gender: existingPost.gender,
-          name: existingPost.name,
-          features: existingPost.features,
+          title: existingPost.title || '',
+          species: existingPost.species || '',
+          color: existingPost.color || '',
+          gender: existingPost.gender || '',
+          name: existingPost.name || '',
+          features: existingPost.features || '',
           date: new Date(existingPost.date),
           time: new Date(existingPost.date),
-          location: existingPost.location,
+          location: existingPost.location || '',
         });
         setPhotos(existingPost.photos || []);
         setMapRegion({
@@ -109,6 +109,11 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
 
   const handleInputChange = (key: string, value: string) => {
     setForm(prevForm => ({ ...prevForm, [key]: value }));
+  };
+  
+  const handleColorSelect = (color: string) => {
+    setForm(prevForm => ({ ...prevForm, color }));
+    setShowColorPicker(false);
   };
   
   const handleSearchQueryChange = (value: string) => {

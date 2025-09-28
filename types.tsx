@@ -110,6 +110,7 @@ export interface Post {
   latitude: number;
   longitude: number;
   userMemberName: string;
+  photos?: string[];
 }
 
 // 매칭 관련 타입

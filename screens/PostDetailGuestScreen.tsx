@@ -52,30 +52,64 @@ const PostDetailGuestScreen = () => {
   }
 
   return (
-    <PostDetailContent post={post} isGuest={true}>
-      {post.status === '귀가 완료' ? (
-        <View style={styles.expiredPostContainer}>
-          <Text style={styles.expiredPostText}>이 게시물은 귀가 완료되었습니다.</Text>
-        </View>
-      ) : (
-        <TouchableOpacity
-          style={styles.bottomButton}
-          onPress={() => {
-            console.log('버튼 클릭됨, post:', post);
-            console.log('post.type:', post?.type);
-            requireLoginAlert();
-          }}
-        >
-          <Text style={styles.bottomButtonText}>
-            {post.type === 'lost' ? '목격했어요' : '1:1 채팅하기'}
-          </Text>
-        </TouchableOpacity>
-      )}
-    </PostDetailContent>
+    <View style={styles.container}>
+      {/* 1. 상단 게시글 타입 표시 컨테이너 추가 */}
+      <View style={styles.postTypeContainer}>
+        <Text style={styles.postTypeText}>
+          {/* 텍스트만 표시하고 중앙 정렬 */}
+          {post.type === 'lost' ? '잃어버렸어요' : '발견했어요'}
+        </Text>
+        {/* 게스트 화면이므로 수정/삭제 버튼은 렌더링하지 않음 */}
+      </View>
+
+      {/* 2. PostDetailContent로 나머지 내용 래핑 */}
+      <PostDetailContent post={post} isGuest={true}>
+        {post.status === '귀가 완료' ? (
+          <View style={styles.expiredPostContainer}>
+            <Text style={styles.expiredPostText}>이 게시물은 귀가 완료되었습니다.</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.bottomButton}
+            onPress={() => {
+              console.log('버튼 클릭됨, post:', post);
+              console.log('post.type:', post?.type);
+              requireLoginAlert();
+            }}
+          >
+            <Text style={styles.bottomButtonText}>
+              {post.type === 'lost' ? '목격했어요' : '1:1 채팅하기'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </PostDetailContent>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: { // 전체 화면 View를 래핑하기 위해 추가
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  // 1. PostDetailScreen에서 가져온 스타일 추가
+  postTypeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center', 
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#fff', 
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+    marginTop: 40, 
+  },
+  postTypeText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  // 2. 기존 스타일 유지
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

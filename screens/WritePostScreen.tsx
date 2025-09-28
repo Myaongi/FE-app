@@ -1,19 +1,19 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useContext, useLayoutEffect } from 'react';
 import {
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { AuthContext } from '../App';
 import CancelIcon from '../assets/images/cancel.svg';
 import WritePostForm from '../components/WritePostForm';
-import { Post } from '../types';
+import { Post, StackNavigation } from '../types';
 
 const WritePostScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<StackNavigation>();
   const route = useRoute();
   const { type, editMode, postId } = route.params as { 
     type: 'lost' | 'witnessed';
