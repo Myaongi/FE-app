@@ -12,7 +12,6 @@ const SignUpScreen = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [memberName, setMemberName] = useState('');
-  const [error, setError] = useState<string | null>(null);
 
   const isValidEmail = (email: string) => {
     const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
@@ -24,19 +23,18 @@ const SignUpScreen = () => {
   }, [navigation]);
 
   const handleNext = () => {
-    setError(null);
     if (step === 1) {
       if (!isValidEmail(email)) {
-        setError('유효하지 않은 이메일 주소입니다.');
+        // Alert.alert 제거
         return;
       }
     } else if (step === 2) {
       if (password.length < 6) {
-        setError('비밀번호는 6자리 이상이어야 합니다.');
+        // Alert.alert 제거
         return;
       }
       if (password !== confirmPassword) {
-        setError('비밀번호가 일치하지 않습니다.');
+        // Alert.alert 제거
         return;
       }
     }
@@ -44,7 +42,6 @@ const SignUpScreen = () => {
   };
 
   const handleBack = () => {
-    setError(null);
     setStep(step - 1);
   };
 
@@ -57,12 +54,11 @@ const SignUpScreen = () => {
     
     if (memberName.length < 2 || memberName.length > 10) {
       console.log('❌ [SIGNUP SCREEN] 닉네임 길이 검증 실패:', memberName.length);
-      setError('닉네임은 2자 이상 10자 이하여야 합니다.');
+      // Alert.alert 제거
       return;
     }
     
     console.log('✅ [SIGNUP SCREEN] 입력 데이터 검증 통과:', { memberName, email });
-    setError(null);
 
     try {
       console.log('🚀 [SIGNUP SCREEN] signup 함수 호출 시작');
@@ -76,13 +72,12 @@ const SignUpScreen = () => {
         navigation.goBack();
       } else {
         console.log('❌ [SIGNUP SCREEN] 회원가입 실패:', response.message);
-        setError(response.message);
+        // Alert.alert 제거
       }
     } catch (err: any) {
       console.log('🚨 [SIGNUP SCREEN] 에러 발생:', err);
       console.log('🚨 [SIGNUP SCREEN] 에러 메시지:', err.message);
-      const message = err.message || '회원가입 중 오류가 발생했습니다. 다시 시도해주세요.';
-      setError(message);
+      // Alert.alert 제거
     }
   };
 
@@ -102,10 +97,9 @@ const SignUpScreen = () => {
           setConfirmPassword={setConfirmPassword}
           memberName={memberName}
           setMemberName={setMemberName}
-          error={error}
           onNext={handleNext}
           onBack={handleBack}
-          onClose={handleClose} // 💡 onBack 대신 onClose를 전달합니다.
+          onClose={handleClose}
           onSignUp={handleSignUp}
         />
       </KeyboardAvoidingView>

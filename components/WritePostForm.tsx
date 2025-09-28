@@ -15,8 +15,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { addPost, getColorList, getPostById, getSpeciesList, mockGeocode, searchSpecies } from '../service/mockApi';
-import { Post } from '../types';
+// 🚨 수정: getCoordinatesByPlaceId 함수를 추가 import 합니다.
+import { addPost, getColorList, getPostById, getSpeciesList, geocodeAddress, getCoordinatesByPlaceId, searchSpecies } from '../service/mockApi'; 
+import { Post, GeocodeResult } from '../types'; 
 import MapViewComponent from './MapViewComponent';
 
 interface WritePostFormProps {
@@ -67,12 +68,20 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
   const [speciesSuggestions, setSpeciesSuggestions] = useState<string[]>([]);
   const [showSpeciesSuggestions, setShowSpeciesSuggestions] = useState(false);
 
+  // 지도 초기 영역 설정 (마커가 없더라도 기본적으로 서울 중앙에 위치)
   const [mapRegion, setMapRegion] = useState({
     latitude: 37.5665,
     longitude: 126.9780,
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   });
+
+  const [markerCoordinates, setMarkerCoordinates] = useState<any | null>(null);
+  const [searchResults, setSearchResults] = useState<GeocodeResult[]>([]); 
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const navigation = useNavigation();
 
   useEffect(() => {
     if (editMode && postId) {
@@ -91,21 +100,24 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
           location: existingPost.location || '',
         });
         setPhotos(existingPost.photos || []);
+        
+        // 지도 및 마커 상태 로드
         setMapRegion({
           latitude: existingPost.latitude,
           longitude: existingPost.longitude,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
+          latitudeDelta: 0.005, // 상세 뷰를 위해 줌인
+          longitudeDelta: 0.005,
+        });
+        setMarkerCoordinates({
+          latitude: existingPost.latitude,
+          longitude: existingPost.longitude,
+          title: existingPost.location,
+          description: '기존 장소',
         });
       }
     }
   }, [editMode, postId]);
-  const [markerCoordinates, setMarkerCoordinates] = useState<any | null>(null);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
 
-  const navigation = useNavigation();
 
   const handleInputChange = (key: string, value: string) => {
     setForm(prevForm => ({ ...prevForm, [key]: value }));
@@ -116,33 +128,60 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
     setShowColorPicker(false);
   };
   
-  const handleSearchQueryChange = (value: string) => {
+  const handleSearchQueryChange = async (value: string) => {
     setSearchQuery(value);
+    
     if (value.length > 1) {
-      const results = mockGeocode(value);
-      setSearchResults(results);
+      try {
+        const results = await geocodeAddress(value);
+        setSearchResults(results);
+      } catch (error) {
+        console.error('위치 검색 중 오류 발생:', error);
+        Alert.alert('검색 오류', '위치 정보를 가져오는 데 실패했습니다.');
+        setSearchResults([]);
+      }
     } else {
       setSearchResults([]);
     }
   };
 
-  const handleLocationSelect = (item: any) => {
+  // 🚨 수정: 선택 시 2단계 (Details API 호출) 로직 추가
+  const handleLocationSelect = async (item: GeocodeResult) => { // async 추가
+    // 1단계: 검색 UI 닫고 주소 업데이트 (좌표는 아직 0이거나 null)
     setForm(prevForm => ({ ...prevForm, location: item.address }));
     setSearchQuery(item.address);
-    setMapRegion({
-      latitude: item.latitude,
-      longitude: item.longitude,
-      latitudeDelta: 0.005,
-      longitudeDelta: 0.005,
-    });
-    setMarkerCoordinates({
-      latitude: item.latitude,
-      longitude: item.longitude,
-      title: item.address,
-      description: '선택된 장소',
-    });
     setSearchResults([]);
     setIsSearching(false);
+    
+    if (!item.id) {
+        Alert.alert('오류', '선택된 장소에 ID가 없어 좌표를 가져올 수 없습니다.');
+        return;
+    }
+
+    try {
+        // 2단계: Place ID로 실제 좌표 조회
+        const coordinates = await getCoordinatesByPlaceId(item.id);
+        
+        // 3단계: 조회된 실제 좌표로 지도 상태 업데이트
+        setMapRegion({
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+        });
+        setMarkerCoordinates({
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+            title: item.address,
+            description: '선택된 장소',
+        });
+        
+    } catch (error) {
+        console.error('좌표 조회 실패:', error);
+        Alert.alert('오류', '선택한 장소의 좌표를 가져오는 데 실패했습니다.');
+        // 좌표 획득 실패 시 마커 초기화
+        setMarkerCoordinates(null);
+    }
   };
   
   const handleDateChange = (event: any, selectedDate?: Date) => {
@@ -362,6 +401,12 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
   const currentUserId = userMemberName;
 
   const handleSubmit = () => {
+  // 🚨 수정: markerCoordinates가 설정되었는지 확인
+  if (!markerCoordinates) {
+    Alert.alert('필수 정보 누락', '지도에서 정확한 장소를 검색하고 선택해 주세요.');
+    return;
+  }
+  
   // 필수 정보 누락 체크 로직
   if (
     !form.title ||
@@ -377,25 +422,27 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
     Alert.alert('필수 정보 누락', '모든 정보를 입력하고 사진을 추가해 주세요.');
     return;
   }
-
-  const newPost = {
+  
+  // 🚨 수정: PostPayload 타입을 따르도록 객체 구조 변경 및 위도/경도 명시
+  const newPostPayload = {
     type,
     title: form.title,
     species: form.species,
     color: form.color,
     location: form.location,
-    date: form.date.toISOString(),
-    status: (type === 'lost' ? '실종' : '목격') as '실종' | '목격',
+    // 날짜와 시간을 합쳐서 ISOString으로 만듭니다.
+    date: new Date(form.date.getFullYear(), form.date.getMonth(), form.date.getDate(), form.time.getHours(), form.time.getMinutes()).toISOString(),
     name: type === 'lost' ? form.name : undefined,
     gender: form.gender,
     features: form.features,
-    locationDetails: form.location,
-    latitude: mapRegion.latitude,
-    longitude: mapRegion.longitude,
+    locationDetails: form.location, 
+    latitude: markerCoordinates.latitude, // 🚨 markerCoordinates 사용
+    longitude: markerCoordinates.longitude, // 🚨 markerCoordinates 사용
+    photos: photos.length > 0 ? photos : undefined, 
   };
 
 
-  const addedPost = addPost(newPost, currentUserId);
+  const addedPost = addPost(newPostPayload, currentUserId);
 
   onSubmit(addedPost);
 };
@@ -406,7 +453,8 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
     form.gender &&
     form.location &&
     (type === 'lost' ? form.name : true) &&
-    (photos.length > 0 || aiImage);
+    (photos.length > 0 || aiImage) && 
+    markerCoordinates; // 🚨 추가: 마커 좌표가 설정되었는지도 유효성 검사에 포함
 
   const formattedDate = form.date.toLocaleDateString('ko-KR', {
     year: 'numeric',
@@ -470,7 +518,7 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
               value={speciesQuery}
               onChangeText={handleSpeciesQueryChange}
               onFocus={() => setShowSpeciesSuggestions(speciesSuggestions.length > 0)}
-            />
+/>
             {showSpeciesSuggestions && (
               <View style={styles.suggestionsContainer}>
                 {speciesSuggestions.map((suggestion, index) => (

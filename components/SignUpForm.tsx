@@ -12,7 +12,7 @@ interface SignUpFormProps {
   setConfirmPassword: (text: string) => void;
   memberName: string;
   setMemberName: (text: string) => void;
-  error: string | null;
+  // 🚨 제거: error Prop 삭제
   onNext: () => void;
   onBack: () => void;
   onClose: () => void;
@@ -29,7 +29,7 @@ const SignUpForm = ({
   setConfirmPassword,
   memberName,
   setMemberName,
-  error,
+  // 🚨 제거: error Prop 삭제
   onNext,
   onBack,
   onClose,
@@ -38,6 +38,7 @@ const SignUpForm = ({
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
+  
   const isButtonDisabled = () => {
     switch (step) {
       case 1:
@@ -51,25 +52,7 @@ const SignUpForm = ({
     }
   };
 
-  const getErrorMessage = (field: 'email' | 'password' | 'confirmPassword' | 'memberName') => {
-    if (!error) return null;
-    if (field === 'email' && error === '유효하지 않은 이메일 주소입니다.') {
-      return '유효하지 않은 이메일 주소예요';
-    }
-    if (field === 'password' && error === '비밀번호는 6자리 이상이어야 합니다.') {
-      return '비밀번호는 6자리 이상이어야 해요';
-    }
-    if (field === 'confirmPassword' && error === '비밀번호가 일치하지 않습니다.') {
-      return '비밀번호가 일치하지 않아요';
-    }
-    if (field === 'memberName' && error === '닉네임은 2자 이상 10자 이하여야 합니다.') {
-      return '닉네임은 2~10자 이내여야 해요';
-    }
-    if (field === 'memberName' && error === '이미 존재하는 닉네임입니다.') {
-      return '이미 존재하는 닉네임이에요';
-    }
-    return null;
-  };
+  // 🚨 제거: getErrorMessage 함수 삭제
 
   const renderStepContent = () => {
     switch (step) {
@@ -77,7 +60,8 @@ const SignUpForm = ({
         return (
           <>
             <Text style={styles.promptText}>이메일로 시작하기</Text>
-            <View style={[styles.inputContainer, getErrorMessage('email') && styles.inputContainerError]}>
+            {/* 🚨 수정: 에러 스타일 조건 제거 */}
+            <View style={styles.inputContainer}>
               <Image 
                 source={(emailFocused || email.trim()) ? require('../assets/images/emon.png') : require('../assets/images/em.png')} 
                 style={styles.inputIcon} 
@@ -94,14 +78,15 @@ const SignUpForm = ({
                 onBlur={() => setEmailFocused(false)}
               />
             </View>
-            {getErrorMessage('email') && <Text style={styles.errorText}>{getErrorMessage('email')}</Text>}
+            {/* 🚨 제거: 이메일 에러 메시지 렌더링 삭제 */}
           </>
         );
       case 2:
         return (
           <>
             <Text style={styles.promptText}>비밀번호 설정</Text>
-            <View style={[styles.inputContainer, getErrorMessage('password') && styles.inputContainerError]}>
+            {/* 🚨 수정: 에러 스타일 조건 제거 */}
+            <View style={styles.inputContainer}>
               <Image 
                 source={(passwordFocused || password.trim()) ? require('../assets/images/pwon.png') : require('../assets/images/pw.png')} 
                 style={styles.inputIcon} 
@@ -117,8 +102,9 @@ const SignUpForm = ({
                 onBlur={() => setPasswordFocused(false)}
               />
             </View>
-            {getErrorMessage('password') && <Text style={styles.errorText}>{getErrorMessage('password')}</Text>}
-            <View style={[styles.inputContainer, getErrorMessage('confirmPassword') && styles.inputContainerError]}>
+            {/* 🚨 제거: 비밀번호 에러 메시지 렌더링 삭제 */}
+            {/* 🚨 수정: 에러 스타일 조건 제거 */}
+            <View style={styles.inputContainer}>
               <Image 
                 source={(confirmPasswordFocused || confirmPassword.trim()) ? require('../assets/images/pwon.png') : require('../assets/images/pw.png')} 
                 style={styles.inputIcon} 
@@ -134,21 +120,22 @@ const SignUpForm = ({
                 onBlur={() => setConfirmPasswordFocused(false)}
               />
             </View>
-            {getErrorMessage('confirmPassword') && <Text style={styles.errorText}>{getErrorMessage('confirmPassword')}</Text>}
+            {/* 🚨 제거: 비밀번호 확인 에러 메시지 렌더링 삭제 */}
           </>
         );
       case 3:
         return (
           <>
             <Text style={styles.promptText}>닉네임 설정</Text>
+            {/* 🚨 수정: 에러 스타일 조건 제거 */}
             <TextInput
-              style={[styles.inputOnly, getErrorMessage('memberName') && styles.inputError]}
+              style={styles.inputOnly /* && styles.inputError*/ }
               placeholder="닉네임"
               placeholderTextColor="#B0B0B0"
               value={memberName}
               onChangeText={setMemberName}
             />
-            {getErrorMessage('memberName') && <Text style={styles.errorText}>{getErrorMessage('memberName')}</Text>}
+            {/* 🚨 제거: 닉네임 에러 메시지 렌더링 삭제 */}
           </>
         );
       default:
@@ -228,7 +215,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     marginBottom: 10,
   },
-  inputContainerError: {
+  inputContainerError: { // 🚨 더 이상 사용되지 않음
     borderBottomColor: 'red',
   },
   inputIcon: {
@@ -251,10 +238,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     fontSize: 16,
   },
-  inputError: {
+  inputError: { // 🚨 더 이상 사용되지 않음
     borderBottomColor: 'red',
   },
-  errorText: {
+  errorText: { // 🚨 더 이상 사용되지 않음
     color: 'red',
     fontSize: 14,
     marginBottom: 10,

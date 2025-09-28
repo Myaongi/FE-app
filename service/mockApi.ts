@@ -11,13 +11,24 @@ import {
   Notification,
   Post,
   SignUpPayload,
-  User
+  User,
+  GeocodeResponse, // types.ts에 추가해야 합니다.
+  PostPayload, // types.ts에 추가해야 합니다.
 } from '../types';
 
-// 백엔드 API 기본 설정
-const API_BASE_URL = 'http://54.180.54.51:8080/api/auth';
+// =========================================================================
+// 1. API 설정 및 클라이언트
+// =========================================================================
 
-// axios 인스턴스 생성
+// 실제 백엔드 API 기본 URL (일반 API)
+const API_BASE_URL = 'http://54.180.54.51:8080/api';
+// 인증(로그인/회원가입) 전용 URL
+const AUTH_BASE_URL = `${API_BASE_URL}/auth`; 
+
+// 🚨 주의: 발급받은 Google Maps API Key로 교체하세요. (app.json의 키와 동일해야 합니다.)
+const GOOGLE_MAPS_API_KEY = 'AIzaSyB41Gt3aQ57cQ3NuOWfIkFmnjKkpO6RNVU'; 
+
+// 일반 API 클라이언트 (토큰 자동 추가)
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
@@ -26,382 +37,383 @@ const apiClient = axios.create({
   },
 });
 
-// 요청 인터셉터 - 토큰 자동 추가
+// 인증 전용 클라이언트 (토큰 불필요)
+const authClient = axios.create({
+  baseURL: AUTH_BASE_URL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// 요청 인터셉터 - 토큰 자동 추가 (apiClient에만 적용)
 apiClient.interceptors.request.use(
   async (config) => {
     console.log('🌐 [AXIOS] 요청 전송:', {
       method: config.method?.toUpperCase(),
       url: config.url,
       baseURL: config.baseURL,
-      fullURL: `${config.baseURL}${config.url}`,
-      headers: config.headers
     });
     
     try {
       const token = await AsyncStorage.getItem('accessToken');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
-        console.log('🔑 [AXIOS] 토큰 추가됨');
-      } else {
-        console.log('🔓 [AXIOS] 토큰 없음');
       }
     } catch (error) {
       console.log('🔓 [AXIOS] 토큰 조회 실패:', error);
     }
     
-    console.log('📤 [AXIOS] 요청 데이터:', config.data);
-    console.log('📤 [AXIOS] 최종 헤더:', config.headers);
     return config;
   },
   (error) => {
-    console.log('🚨 [AXIOS] 요청 인터셉터 에러:', error);
     return Promise.reject(error);
   }
 );
 
-// 응답 인터셉터 - 에러 처리
-apiClient.interceptors.response.use(
-  (response) => {
+// 응답 인터셉터 - 에러 처리 (apiClient, authClient 모두 사용)
+const responseInterceptor = (response: any) => {
     console.log('✅ [AXIOS] 응답 받음:', {
-      status: response.status,
-      statusText: response.statusText,
-      url: response.config.url,
-      data: response.data
-    });
-    return response;
-  },
-  (error) => {
+        status: response.status,
+        statusText: response.statusText,
+        url: response.config.url,
+        data: response.data
+      });
+  return response;
+};
+
+const errorInterceptor = (error: any) => {
     console.log('🚨 [AXIOS] 응답 에러:', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      url: error.config?.url,
-      data: error.response?.data,
-      message: error.message,
-      request: {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
         url: error.config?.url,
-        method: error.config?.method,
-        data: error.config?.data,
-        headers: error.config?.headers
-      }
-    });
-    
-    if (error.response?.status === 401) {
-      console.log('🔓 [AXIOS] 401 에러 - 토큰 제거');
-      // 토큰 만료 시 자동 로그아웃 처리
-      AsyncStorage.removeItem('accessToken').catch(err => 
-        console.log('🔓 [AXIOS] 토큰 제거 실패:', err)
-      );
-    }
-    return Promise.reject(error);
+        data: error.response?.data,
+        message: error.message,
+      });
+
+  if (error.response?.status === 401) {
+    console.log('🔓 [AXIOS] 401 에러 - 토큰 제거');
+    // 토큰 만료 시 자동 로그아웃 처리
+    AsyncStorage.removeItem('accessToken').catch(err => 
+      console.log('🔓 [AXIOS] 토큰 제거 실패:', err)
+    );
   }
-);
+  return Promise.reject(error);
+};
+
+apiClient.interceptors.response.use(responseInterceptor, errorInterceptor);
+authClient.interceptors.response.use(responseInterceptor, errorInterceptor);
 
 let idCounter = 1;
 const generateUniqueId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${idCounter++}`;
 
+// =========================================================================
+// 2. Mock Data (기존 데이터 유지)
+// =========================================================================
+
 // memberName으로 통일
 const mockUsers: User[] = [
-  { memberName: '멍멍이주인1', email: 'owner1@test.com', password: 'password1' },
-  { memberName: '멍멍이목격1', email: 'witness1@test.com', password: 'password1' },
-  { memberName: '멍멍이주인2', email: 'owner2@test.com', password: 'password2' },
-  { memberName: '멍멍이목격2', email: 'witness2@test.com', password: 'password2' },
-  { memberName: '멍멍이주인3', email: 'owner3@test.com', password: 'password3' },
-  { memberName: '멍멍이목격3', email: 'witness3@test.com', password: 'password3' },
-  { memberName: '멍멍이주인4', email: 'owner4@test.com', password: 'password4' },
-  { memberName: '멍멍이목격4', email: 'witness4@test.com', password: 'password4' },
-  { memberName: '멍멍이주인5', email: 'owner5@test.com', password: 'password5' },
-  { memberName: '멍멍이목격5', email: 'witness5@test.com', password: 'password5' },
-  { memberName: '멍멍이주인6', email: 'owner6@test.com', password: 'password6' },
-  { memberName: '멍멍이목격6', email: 'witness6@test.com', password: 'password6' },
+    { memberName: '멍멍이주인1', email: 'owner1@test.com', password: 'password1' },
+    { memberName: '멍멍이목격1', email: 'witness1@test.com', password: 'password1' },
+    { memberName: '멍멍이주인2', email: 'owner2@test.com', password: 'password2' },
+    { memberName: '멍멍이목격2', email: 'witness2@test.com', password: 'password2' },
+    { memberName: '멍멍이주인3', email: 'owner3@test.com', password: 'password3' },
+    { memberName: '멍멍이목격3', email: 'witness3@test.com', password: 'password3' },
+    { memberName: '멍멍이주인4', email: 'owner4@test.com', password: 'password4' },
+    { memberName: '멍멍이목격4', email: 'witness4@test.com', password: 'password4' },
+    { memberName: '멍멍이주인5', email: 'owner5@test.com', password: 'password5' },
+    { memberName: '멍멍이목격5', email: 'witness5@test.com', password: 'password5' },
+    { memberName: '멍멍이주인6', email: 'owner6@test.com', password: 'password6' },
+    { memberName: '멍멍이목격6', email: 'witness6@test.com', password: 'password6' },
 ];
 
 // 필드명을 userMemberName으로 통일
 const mockPosts: Post[] = [
-  {
-    id: '1',
-    userMemberName: '멍멍이주인1', // userMemberName으로 통일
-    type: 'lost',
-    title: '동네에서 강아지를 잃어버렸어요',
-    species: '푸들',
-    color: '갈색',
-    location: '서울시 강남구',
-    date: '2025.09.11 10:00',
-    status: '실종',
-    name: '호두',
-    gender: '수컷',
-    features: '겁이 많고 사람을 잘 따름',
-    locationDetails: '강남역 2번 출구 근처',
-    uploadedAt: '2025-09-11T10:30:00Z',
-    latitude: 37.497951,
-    longitude: 127.028793,
-  },
-  {
-    id: '2',
-    userMemberName: '멍멍이목격1', // userMemberName으로 통일
-    type: 'witnessed',
-    title: '산책하다가 길 잃은 강아지를 봤어요',
-    species: '포메라니안',
-    color: '흰색',
-    location: '경기도 용인시',
-    date: '2025.09.10 15:30',
-    status: '목격',
-    name: undefined,
-    gender: '암컷',
-    features: '가슴 털이 길고 목줄이 풀려있었음',
-    locationDetails: '용인시민공원 운동장',
-    uploadedAt: '2025-09-10T15:30:00Z',
-    latitude: 37.234692,
-    longitude: 127.202302,
-  },
-  {
-    id: '3',
-    userMemberName: '멍멍이주인2', // userMemberName으로 통일
-    type: 'lost',
-    title: '우리 아치 어딨어요',
-    species: '말티푸',
-    color: '흰색갈색',
-    location: '서울시 송파구',
-    date: '2025.09.09 18:45',
-    status: '실종',
-    name: '아치',
-    gender: '수컷',
-    features: '장난을 좋아하고 낯을 가림',
-    locationDetails: '올림픽공원 호수 근처',
-    uploadedAt: '2025-09-09T18:45:00Z',
-    latitude: 37.520468,
-    longitude: 127.120619,
-  },
-  {
-    id: '4',
-    userMemberName: '멍멍이목격2', // userMemberName으로 통일
-    type: 'witnessed',
-    title: '공원에서 혼자 다니는 강아지',
-    species: '말티푸',
-    color: '검정색',
-    location: '인천시 서구',
-    date: '2025.09.08 12:10',
-    status: '목격',
-    name: undefined,
-    gender: '암컷',
-    features: '다리가 짧고 털이 곱슬거림',
-    locationDetails: '서구청 근처 공원',
-    uploadedAt: '2025-09-08T12:10:00Z',
-    latitude: 37.525547,
-    longitude: 126.671399,
-  },
-  {
-    id: '5',
-    userMemberName: '멍멍이주인3', // userMemberName으로 통일
-    type: 'lost',
-    title: '활발한 시바견이 안 보여요',
-    species: '시바견',
-    color: '황색',
-    location: '광주시 서구',
-    date: '2025.09.04 17:20',
-    status: '실종',
-    name: '루비',
-    gender: '수컷',
-    features: '친화력이 좋고 장난을 좋아함',
-    locationDetails: '광주 시청 공원',
-    uploadedAt: '2025-09-04T17:20:00Z',
-    latitude: 35.160161,
-    longitude: 126.851509,
-  },
-  {
-    id: '6',
-    userMemberName: '멍멍이목격3', // userMemberName으로 통일
-    type: 'witnessed',
-    title: '주변을 배회하는 푸들',
-    species: '푸들',
-    color: '회색',
-    location: '대전시 유성구',
-    date: '2025.09.03 08:30',
-    status: '목격',
-    name: undefined,
-    gender: '암컷',
-    features: '목줄이 끊어진 채 배회함',
-    locationDetails: '카이스트 캠퍼스 근처',
-    uploadedAt: '2025-09-03T08:30:00Z',
-    latitude: 36.370211,
-    longitude: 127.359253,
-  },
-  {
-    id: '7',
-    userMemberName: '멍멍이주인4', // userMemberName으로 통일
-    type: 'lost',
-    title: '작고 귀여운 푸들 찾아주세요',
-    species: '푸들',
-    color: '회색',
-    location: '대전시 유성구',
-    date: '2025.09.03 08:30',
-    status: '귀가 완료',
-    name: '미미',
-    gender: '수컷',
-    features: '활발하고 짖음이 잦음',
-    locationDetails: '도안동 아파트 단지',
-    uploadedAt: '2025-09-03T08:30:00Z',
-    latitude: 36.335968,
-    longitude: 127.329713,
-  },
-  {
-    id: '8',
-    userMemberName: '멍멍이목격4', // userMemberName으로 통일
-    type: 'witnessed',
-    title: '주인 없는 비숑을 보았습니다',
-    species: '비숑',
-    color: '흰색',
-    location: '울산시 남구',
-    date: '2025.09.02 21:00',
-    status: '목격',
-    name: undefined,
-    gender: '수컷',
-    features: '털이 엉켜있고 몹시 불안해 보임',
-    locationDetails: '태화강 공원 산책로',
-    uploadedAt: '2025-09-02T21:00:00Z',
-    latitude: 35.530364,
-    longitude: 129.317532,
-  },
-  {
-    id: '9',
-    userMemberName: '멍멍이주인5', // userMemberName으로 통일
-    type: 'lost',
-    title: '말티즈를 찾아요',
-    species: '말티즈',
-    color: '흰색',
-    location: '세종시',
-    date: '2025.09.01 10:40',
-    status: '실종',
-    name: '뽀삐',
-    gender: '암컷',
-    features: '흰색 털에 눈물이 많음',
-    locationDetails: '세종호수공원 주차장',
-    uploadedAt: '2025-09-01T10:40:00Z',
-    latitude: 36.502931,
-    longitude: 127.291771,
-  },
-  {
-    id: '10',
-    userMemberName: '멍멍이목격5', // userMemberName으로 통일
-    type: 'witnessed',
-    title: '공원 벤치에 혼자 있는 강아지',
-    species: '닥스훈트',
-    color: '검은색',
-    location: '대구시 달서구',
-    date: '2025.09.07 09:10',
-    status: '목격',
-    name: undefined,
-    gender: '수컷',
-    features: '몸에 반점이 있는 털 짧은 강아지',
-    locationDetails: '두류공원 야외음악당 근처',
-    uploadedAt: '2025-09-07T09:10:00Z',
-    latitude: 35.850785,
-    longitude: 128.566373,
-  },
-  {
-    id: '11',
-    userMemberName: '멍멍이주인6', // userMemberName으로 통일
-    type: 'lost',
-    title: '우리 아기 강아지 찾아주세요',
-    species: '시바견',
-    color: '황색',
-    location: '광주시 서구',
-    date: '2025.09.04 17:20',
-    status: '실종',
-    name: '시로',
-    gender: '암컷',
-    features: '사람을 무서워함',
-    locationDetails: '상무지구 근처',
-    uploadedAt: '2025-09-04T17:20:00Z',
-    latitude: 35.150060,
-    longitude: 126.856987,
-  },
-  {
-    id: '12',
-    userMemberName: '멍멍이목격6', // userMemberName으로 통일
-    type: 'witnessed',
-    title: '겁에 질려있는 작은 강아지 목격',
-    species: '치와와',
-    color: '갈색',
-    location: '인천시 남동구',
-    date: '2025.09.05 11:00',
-    status: '목격',
-    name: undefined,
-    gender: '수컷',
-    features: '작은 몸에 털이 곱슬함',
-    locationDetails: '예술회관 공원 근처',
-    uploadedAt: '2025-09-05T11:00:00Z',
-    latitude: 37.447548,
-    longitude: 126.702008,
-  },
+    {
+        id: '1',
+        userMemberName: '멍멍이주인1', // userMemberName으로 통일
+        type: 'lost',
+        title: '동네에서 강아지를 잃어버렸어요',
+        species: '푸들',
+        color: '갈색',
+        location: '서울시 강남구',
+        date: '2025.09.11 10:00',
+        status: '실종',
+        name: '호두',
+        gender: '수컷',
+        features: '겁이 많고 사람을 잘 따름',
+        locationDetails: '강남역 2번 출구 근처',
+        uploadedAt: '2025-09-11T10:30:00Z',
+        latitude: 37.497951,
+        longitude: 127.028793,
+    },
+    {
+        id: '2',
+        userMemberName: '멍멍이목격1', // userMemberName으로 통일
+        type: 'witnessed',
+        title: '산책하다가 길 잃은 강아지를 봤어요',
+        species: '포메라니안',
+        color: '흰색',
+        location: '경기도 용인시',
+        date: '2025.09.10 15:30',
+        status: '목격',
+        name: undefined,
+        gender: '암컷',
+        features: '가슴 털이 길고 목줄이 풀려있었음',
+        locationDetails: '용인시민공원 운동장',
+        uploadedAt: '2025-09-10T15:30:00Z',
+        latitude: 37.234692,
+        longitude: 127.202302,
+    },
+    {
+        id: '3',
+        userMemberName: '멍멍이주인2', // userMemberName으로 통일
+        type: 'lost',
+        title: '우리 아치 어딨어요',
+        species: '말티푸',
+        color: '흰색갈색',
+        location: '서울시 송파구',
+        date: '2025.09.09 18:45',
+        status: '실종',
+        name: '아치',
+        gender: '수컷',
+        features: '장난을 좋아하고 낯을 가림',
+        locationDetails: '올림픽공원 호수 근처',
+        uploadedAt: '2025-09-09T18:45:00Z',
+        latitude: 37.520468,
+        longitude: 127.120619,
+    },
+    {
+        id: '4',
+        userMemberName: '멍멍이목격2', // userMemberName으로 통일
+        type: 'witnessed',
+        title: '공원에서 혼자 다니는 강아지',
+        species: '말티푸',
+        color: '검정색',
+        location: '인천시 서구',
+        date: '2025.09.08 12:10',
+        status: '목격',
+        name: undefined,
+        gender: '암컷',
+        features: '다리가 짧고 털이 곱슬거림',
+        locationDetails: '서구청 근처 공원',
+        uploadedAt: '2025-09-08T12:10:00Z',
+        latitude: 37.525547,
+        longitude: 126.671399,
+    },
+    {
+        id: '5',
+        userMemberName: '멍멍이주인3', // userMemberName으로 통일
+        type: 'lost',
+        title: '활발한 시바견이 안 보여요',
+        species: '시바견',
+        color: '황색',
+        location: '광주시 서구',
+        date: '2025.09.04 17:20',
+        status: '실종',
+        name: '루비',
+        gender: '수컷',
+        features: '친화력이 좋고 장난을 좋아함',
+        locationDetails: '광주 시청 공원',
+        uploadedAt: '2025-09-04T17:20:00Z',
+        latitude: 35.160161,
+        longitude: 126.851509,
+    },
+    {
+        id: '6',
+        userMemberName: '멍멍이목격3', // userMemberName으로 통일
+        type: 'witnessed',
+        title: '주변을 배회하는 푸들',
+        species: '푸들',
+        color: '회색',
+        location: '대전시 유성구',
+        date: '2025.09.03 08:30',
+        status: '목격',
+        name: undefined,
+        gender: '암컷',
+        features: '목줄이 끊어진 채 배회함',
+        locationDetails: '카이스트 캠퍼스 근처',
+        uploadedAt: '2025-09-03T08:30:00Z',
+        latitude: 36.370211,
+        longitude: 127.359253,
+    },
+    {
+        id: '7',
+        userMemberName: '멍멍이주인4', // userMemberName으로 통일
+        type: 'lost',
+        title: '작고 귀여운 푸들 찾아주세요',
+        species: '푸들',
+        color: '회색',
+        location: '대전시 유성구',
+        date: '2025.09.03 08:30',
+        status: '귀가 완료',
+        name: '미미',
+        gender: '수컷',
+        features: '활발하고 짖음이 잦음',
+        locationDetails: '도안동 아파트 단지',
+        uploadedAt: '2025-09-03T08:30:00Z',
+        latitude: 36.335968,
+        longitude: 127.329713,
+    },
+    {
+        id: '8',
+        userMemberName: '멍멍이목격4', // userMemberName으로 통일
+        type: 'witnessed',
+        title: '주인 없는 비숑을 보았습니다',
+        species: '비숑',
+        color: '흰색',
+        location: '울산시 남구',
+        date: '2025.09.02 21:00',
+        status: '목격',
+        name: undefined,
+        gender: '수컷',
+        features: '털이 엉켜있고 몹시 불안해 보임',
+        locationDetails: '태화강 공원 산책로',
+        uploadedAt: '2025-09-02T21:00:00Z',
+        latitude: 35.530364,
+        longitude: 129.317532,
+    },
+    {
+        id: '9',
+        userMemberName: '멍멍이주인5', // userMemberName으로 통일
+        type: 'lost',
+        title: '말티즈를 찾아요',
+        species: '말티즈',
+        color: '흰색',
+        location: '세종시',
+        date: '2025.09.01 10:40',
+        status: '실종',
+        name: '뽀삐',
+        gender: '암컷',
+        features: '흰색 털에 눈물이 많음',
+        locationDetails: '세종호수공원 주차장',
+        uploadedAt: '2025-09-01T10:40:00Z',
+        latitude: 36.502931,
+        longitude: 127.291771,
+    },
+    {
+        id: '10',
+        userMemberName: '멍멍이목격5', // userMemberName으로 통일
+        type: 'witnessed',
+        title: '공원 벤치에 혼자 있는 강아지',
+        species: '닥스훈트',
+        color: '검은색',
+        location: '대구시 달서구',
+        date: '2025.09.07 09:10',
+        status: '목격',
+        name: undefined,
+        gender: '수컷',
+        features: '몸에 반점이 있는 털 짧은 강아지',
+        locationDetails: '두류공원 야외음악당 근처',
+        uploadedAt: '2025-09-07T09:10:00Z',
+        latitude: 35.850785,
+        longitude: 128.566373,
+    },
+    {
+        id: '11',
+        userMemberName: '멍멍이주인6', // userMemberName으로 통일
+        type: 'lost',
+        title: '우리 아기 강아지 찾아주세요',
+        species: '시바견',
+        color: '황색',
+        location: '광주시 서구',
+        date: '2025.09.04 17:20',
+        status: '실종',
+        name: '시로',
+        gender: '암컷',
+        features: '사람을 무서워함',
+        locationDetails: '상무지구 근처',
+        uploadedAt: '2025-09-04T17:20:00Z',
+        latitude: 35.150060,
+        longitude: 126.856987,
+    },
+    {
+        id: '12',
+        userMemberName: '멍멍이목격6', // userMemberName으로 통일
+        type: 'witnessed',
+        title: '겁에 질려있는 작은 강아지 목격',
+        species: '치와와',
+        color: '갈색',
+        location: '인천시 남동구',
+        date: '2025.09.05 11:00',
+        status: '목격',
+        name: undefined,
+        gender: '수컷',
+        features: '작은 몸에 털이 곱슬함',
+        locationDetails: '예술회관 공원 근처',
+        uploadedAt: '2025-09-05T11:00:00Z',
+        latitude: 37.447548,
+        longitude: 126.702008,
+    },
 ];
 
 const mockMatches: Match[] = [
-  {
-    id: '1',
-    type: 'lost',
-    title: '동네에서 강아지를 잃어버렸어요',
-    dateLabel: '잃어버린 날짜/시간',
-    species: '푸들',
-    color: '갈색',
-    location: '서울시 강남구',
-    date: '2025.09.11 10:00',
-    similarity: 95,
-  },
-  {
-    id: '2',
-    type: 'witnessed',
-    title: '산책하다가 길 잃은 강아지를 봤어요',
-    dateLabel: '목격한 날짜/시간',
-    species: '포메라니안',
-    color: '흰색',
-    location: '경기도 용인시',
-    date: '2025.09.10 15:30',
-    similarity: 88,
-  },
-  {
-    id: '3',
-    type: 'lost',
-    title: '우리 아치 어딨어요',
-    dateLabel: '잃어버린 날짜/시간',
-    species: '말티푸',
-    color: '흰색갈색',
-    location: '서울시 송파구',
-    date: '2025.09.09 18:45',
-    similarity: 78,
-  },
-  {
-    id: '4',
-    type: 'witnessed',
-    title: '공원에서 혼자 다니는 강아지',
-    dateLabel: '목격한 날짜/시간',
-    species: '말티푸',
-    color: '검정색',
-    location: '인천시 서구',
-    date: '2025.09.08 12:10',
-    similarity: 65,
-  },
-  {
-    id: '5',
-    type: 'lost',
-    title: '활발한 시바견이 안 보여요',
-    dateLabel: '잃어버린 날짜/시간',
-    species: '시바견',
-    color: '황색',
-    location: '광주시 서구',
-    date: '2025.09.04 17:20',
-    similarity: 52,
-  },
-  {
-    id: '6',
-    type: 'witnessed',
-    title: '주변을 배회하는 푸들',
-    dateLabel: '목격한 날짜/시간',
-    species: '푸들',
-    color: '회색',
-    location: '대전시 유성구',
-    date: '2025.09.03 08:30',
-    similarity: 45,
-  },
+    {
+        id: '1',
+        type: 'lost',
+        title: '동네에서 강아지를 잃어버렸어요',
+        dateLabel: '잃어버린 날짜/시간',
+        species: '푸들',
+        color: '갈색',
+        location: '서울시 강남구',
+        date: '2025.09.11 10:00',
+        similarity: 95,
+    },
+    {
+        id: '2',
+        type: 'witnessed',
+        title: '산책하다가 길 잃은 강아지를 봤어요',
+        dateLabel: '목격한 날짜/시간',
+        species: '포메라니안',
+        color: '흰색',
+        location: '경기도 용인시',
+        date: '2025.09.10 15:30',
+        similarity: 88,
+    },
+    {
+        id: '3',
+        type: 'lost',
+        title: '우리 아치 어딨어요',
+        dateLabel: '잃어버린 날짜/시간',
+        species: '말티푸',
+        color: '흰색갈색',
+        location: '서울시 송파구',
+        date: '2025.09.09 18:45',
+        similarity: 78,
+    },
+    {
+        id: '4',
+        type: 'witnessed',
+        title: '공원에서 혼자 다니는 강아지',
+        dateLabel: '목격한 날짜/시간',
+        species: '말티푸',
+        color: '검정색',
+        location: '인천시 서구',
+        date: '2025.09.08 12:10',
+        similarity: 65,
+    },
+    {
+        id: '5',
+        type: 'lost',
+        title: '활발한 시바견이 안 보여요',
+        dateLabel: '잃어버린 날짜/시간',
+        species: '시바견',
+        color: '황색',
+        location: '광주시 서구',
+        date: '2025.09.04 17:20',
+        similarity: 52,
+    },
+    {
+        id: '6',
+        type: 'witnessed',
+        title: '주변을 배회하는 푸들',
+        dateLabel: '목격한 날짜/시간',
+        species: '푸들',
+        color: '회색',
+        location: '대전시 유성구',
+        date: '2025.09.03 08:30',
+        similarity: 45,
+    },
 ];
 
 const mockChatRooms: ChatRoom[] = [];
@@ -409,39 +421,44 @@ const mockChatMessages: { [roomId: string]: Message[] } = {};
 
 // ✅ 알림 데이터 추가
 const mockNotifications: Notification[] = [
-  {
-    id: 'notif_1',
-    type: 'NEW_POST_NEARBY',
-    title: '내 근처 새 게시글',
-    message: '근처에 새로운 제보가 올라왔어요. 골든타임이 지나기 전에 함께 찾아주세요🙏',
-    timestamp: new Date().toISOString(),
-    postId: '5',
-    thumbnail: 'https://via.placeholder.com/60',
-  },
-  {
-    id: 'notif_2',
-    type: 'MATCH_FOUND',
-    title: '새로운 매칭',
-    message: '아치와 닮은 아이 소식이 있어요! 확인해볼까요?',
-    timestamp: new Date(Date.now() - 3600000).toISOString(), // 1시간 전
-    postId: '3',
-    thumbnail: 'https://via.placeholder.com/60',
-  },
-  {
-    id: 'notif_3',
-    type: 'WITNESS_REPORT',
-    title: '목격카드 도착',
-    message: '내 게시글에 새 목격카드가 도착했어요. 목격자와 1:1 채팅으로 확인해봐요.',
-    timestamp: new Date(Date.now() - 86400000 * 15).toISOString(), // 15일 전
-    postId: '1',
-    thumbnail: 'https://via.placeholder.com/60',
-  },
+    {
+        id: 'notif_1',
+        type: 'NEW_POST_NEARBY',
+        title: '내 근처 새 게시글',
+        message: '근처에 새로운 제보가 올라왔어요. 골든타임이 지나기 전에 함께 찾아주세요🙏',
+        timestamp: new Date().toISOString(),
+        postId: '5',
+        thumbnail: 'https://via.placeholder.com/60',
+    },
+    {
+        id: 'notif_2',
+        type: 'MATCH_FOUND',
+        title: '새로운 매칭',
+        message: '아치와 닮은 아이 소식이 있어요! 확인해볼까요?',
+        timestamp: new Date(Date.now() - 3600000).toISOString(), // 1시간 전
+        postId: '3',
+        thumbnail: 'https://via.placeholder.com/60',
+    },
+    {
+        id: 'notif_3',
+        type: 'WITNESS_REPORT',
+        title: '목격카드 도착',
+        message: '내 게시글에 새 목격카드가 도착했어요. 목격자와 1:1 채팅으로 확인해봐요.',
+        timestamp: new Date(Date.now() - 86400000 * 15).toISOString(), // 15일 전
+        postId: '1',
+        thumbnail: 'https://via.placeholder.com/60',
+    },
 ];
+
+// =========================================================================
+// 3. 인증 API (AuthClient 사용)
+// =========================================================================
 
 // 로그인 함수 (실제 API)
 export const login = async (payload: LoginPayload): Promise<ApiResponse<AuthResult>> => {
   try {
-    const response = await apiClient.post('/login', {
+    // authClient의 baseURL이 이미 /api/auth이므로, 경로는 /login만 사용
+    const response = await authClient.post('/login', {
       email: payload.email,
       password: payload.password,
     });
@@ -449,159 +466,201 @@ export const login = async (payload: LoginPayload): Promise<ApiResponse<AuthResu
     const apiResponse: ApiResponse<AuthResult> = response.data;
     
     if (apiResponse.isSuccess) {
-      // 로그인 성공 시 토큰을 AsyncStorage에 저장
       if (apiResponse.result?.token) {
-        try {
-          await AsyncStorage.setItem('accessToken', apiResponse.result.token);
-        } catch (error) {
-          console.log('토큰 저장 실패:', error);
-        }
+        await AsyncStorage.setItem('accessToken', apiResponse.result.token);
       }
       return apiResponse;
     } else {
-      // 백엔드 에러 메시지를 포함한 에러를 throw
       throw new Error(apiResponse.message);
     }
   } catch (error: any) {
-    // 백엔드 에러 응답에서 메시지를 추출하여 throw
-    if (error.response?.data?.message) {
-      throw new Error(error.response.data.message);
-    } else if (error.message) {
-      throw new Error(error.message);
-    } else {
-      throw new Error('로그인 중 오류가 발생했습니다.');
-    }
+    const errorMessage = error.response?.data?.message || error.message || '로그인 중 오류가 발생했습니다.';
+    throw new Error(errorMessage);
   }
 };
 
 // 회원가입 함수 (실제 API)
 export const signup = async (payload: SignUpPayload): Promise<ApiResponse<null>> => {
-  console.log('📝 [SIGNUP] 회원가입 시도 시작:', { 
-    memberName: payload.memberName, 
-    email: payload.email,
-    passwordLength: payload.password?.length
-  });
-  
   try {
-    console.log('🌐 [SIGNUP] API 요청 전송 중...', { url: `${API_BASE_URL}/signup` });
-    
-    // 요청 데이터 구성
-    const requestData = {
+    // authClient의 baseURL이 이미 /api/auth이므로, 경로는 /signup만 사용
+    const response = await authClient.post('/signup', {
       memberName: payload.memberName,
       email: payload.email,
       password: payload.password,
-    };
-    
-    console.log('📤 [SIGNUP] 요청 데이터 상세:', {
-      memberName: requestData.memberName,
-      memberNameType: typeof requestData.memberName,
-      memberNameLength: requestData.memberName?.length,
-      email: requestData.email,
-      emailType: typeof requestData.email,
-      passwordLength: requestData.password?.length,
-      passwordType: typeof requestData.password,
-      전체데이터: requestData
     });
-    
-    const response = await apiClient.post('/signup', requestData);
-    
-    console.log('✅ [SIGNUP] API 응답 받음:', response.data);
     
     const apiResponse: ApiResponse<null> = response.data;
     
     if (apiResponse.isSuccess) {
-      console.log('🎉 [SIGNUP] 회원가입 성공');
       return apiResponse;
     } else {
-      console.log('❌ [SIGNUP] 회원가입 실패:', apiResponse.message);
       throw new Error(apiResponse.message);
     }
   } catch (error: any) {
-    console.log('🚨 [SIGNUP] 에러 발생:', error);
-    
-    // 백엔드 에러 응답에서 메시지를 추출하여 throw
-    if (error.response?.data?.message) {
-      throw new Error(error.response.data.message);
-    } else if (error.message) {
-      throw new Error(error.message);
-    } else {
-      throw new Error('회원가입 중 오류가 발생했습니다.');
-    }
+    const errorMessage = error.response?.data?.message || error.message || '회원가입 중 오류가 발생했습니다.';
+    throw new Error(errorMessage);
   }
 };
 
 // 토큰 리프레시 함수 (실제 API)
 export const refreshToken = async (): Promise<ApiResponse<AuthResult>> => {
   try {
-    const response = await apiClient.post('/refresh');
-
+    // authClient의 baseURL이 이미 /api/auth이므로, 경로는 /refresh만 사용
+    const response = await authClient.post('/refresh'); 
     const apiResponse: ApiResponse<AuthResult> = response.data;
     
-    if (apiResponse.isSuccess) {
-      // 새로 받은 토큰을 AsyncStorage에 업데이트
-      if (apiResponse.result?.token) {
-        try {
-          await AsyncStorage.setItem('accessToken', apiResponse.result.token);
-        } catch (error) {
-          console.log('토큰 업데이트 실패:', error);
-        }
-      }
-      return apiResponse;
-    } else {
-      throw new Error(apiResponse.message);
+    if (apiResponse.isSuccess && apiResponse.result?.token) {
+      await AsyncStorage.setItem('accessToken', apiResponse.result.token);
     }
+    return apiResponse;
   } catch (error: any) {
-    if (error.response?.data?.message) {
-      throw new Error(error.response.data.message);
-    } else if (error.message) {
-      throw new Error(error.message);
-    } else {
-      throw new Error('토큰 갱신 중 오류가 발생했습니다.');
-    }
+    const errorMessage = error.response?.data?.message || error.message || '토큰 갱신 중 오류가 발생했습니다.';
+    throw new Error(errorMessage);
   }
 };
 
-//사용자 위치 정보 저장 (Mock)
-export const saveUserLocation = (memberName: string, location: { latitude: number; longitude: number }): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const user = mockUsers.find(u => u.memberName === memberName);
-      if (user) {
-        // 기존 객체에 location 필드를 추가/업데이트
-        user.location = location;
-        console.log(`Mock: User ${memberName} location saved:`, location);
-        resolve();
-      } else {
-        // 회원가입으로 새로 추가된 유저일 경우를 대비
-        const newUser: User = { memberName, email: '', location };
-        mockUsers.push(newUser);
-        console.log(`Mock: New user ${memberName} created and location saved:`, location);
-        resolve();
+
+// =========================================================================
+// 4. Google Maps API (실제 API 연동)
+// =========================================================================
+
+/**
+ * 주소를 위/경도로 변환합니다 (Google Places API Autocomplete 사용).
+ * 네이버 지도와 같이 입력과 동시에 장소 추천 목록을 반환합니다.
+ * @param address 검색할 주소 또는 장소 이름 (입력 텍스트)
+ * @returns GeocodeResult 배열 (추천 목록)
+ */
+export const geocodeAddress = async (address: string): Promise<GeocodeResult[]> => {
+  if (!GOOGLE_MAPS_API_KEY) { 
+    console.error('🚨 Google Maps API Key가 설정되지 않았습니다. 위치 검색을 수행할 수 없습니다.');
+    throw new Error('API Key가 없어 위치 검색을 수행할 수 없습니다.');
+  }
+  
+  try {
+    // 🚨 Places Autocomplete API 호출 (추천 목록 반환)
+    const url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'; 
+    
+    const response = await axios.get(url, { // 🚨 수정: response 변수 선언 추가
+      params: {
+        input: address, // Autocomplete는 'input' 파라미터를 사용합니다.
+        key: GOOGLE_MAPS_API_KEY,
+        language: 'ko',
+      },
+    });
+
+    if (response.data.status !== 'OK') {
+      if (response.data.status === 'ZERO_RESULTS') {
+        return [];
       }
-    }, 500);
-  });
+      console.error('Places Autocomplete API 에러:', response.data.status, response.data.error_message);
+      return []; 
+    }
+
+    // Places Autocomplete API 결과는 'predictions'에 담겨 있습니다.
+    const results: GeocodeResult[] = response.data.predictions.map((prediction: any) => ({
+      id: prediction.place_id,
+      address: prediction.description, // 사용자에게 보여줄 추천 텍스트
+      // 좌표는 Details API로 가져올 것이므로 null로 설정
+      latitude: null, 
+      longitude: null,
+    }));
+
+    return results;
+
+  } catch (error) {
+    console.error('Places Autocomplete API 호출 실패:', error);
+    throw new Error('위치 검색 중 오류가 발생했습니다.');
+  }
 };
 
-// 푸시 토큰 저장 (Mock)
-export const savePushToken = (memberName: string, pushToken: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const user = mockUsers.find(u => u.memberName === memberName);
-      if (user) {
-        // 기존 mockUsers 배열의 객체에 pushToken 필드를 추가/업데이트
-        user.pushToken = pushToken;
-        console.log(`Mock: User ${memberName} push token saved: ${pushToken}`);
-        resolve();
-      } else {
-        // 회원가입으로 새로 추가된 유저일 경우 대비
-        const newUser: User = { memberName, email: '', pushToken };
-        mockUsers.push(newUser);
-        console.log(`Mock: New user ${memberName} created and push token saved: ${pushToken}`);
-        resolve();
-      }
-    }, 500);
-  });
+
+/**
+ * Place ID를 이용해 장소의 실제 좌표를 조회합니다 (Google Places Details API 사용).
+ * Autocomplete API 결과에서 좌표를 얻기 위한 필수 함수입니다.
+ * @param placeId Autocomplete API에서 반환된 place_id
+ * @returns { latitude: number, longitude: number }
+ */
+export const getCoordinatesByPlaceId = async (placeId: string): Promise<{ latitude: number, longitude: number }> => {
+  if (!GOOGLE_MAPS_API_KEY) {
+    throw new Error('API Key가 없어 위치 세부 정보를 조회할 수 없습니다.');
+  }
+  
+  try {
+    // 🚨 Places Details API 엔드포인트 (실제 좌표 획득)
+    const url = 'https://maps.googleapis.com/maps/api/place/details/json';
+    
+    const response = await axios.get(url, {
+      params: {
+        place_id: placeId,
+        key: GOOGLE_MAPS_API_KEY,
+        fields: 'geometry', // 좌표(geometry) 정보만 요청
+        language: 'ko',
+      },
+    });
+
+    if (response.data.status !== 'OK') {
+      console.error('Places Details API 에러:', response.data.status, response.data.error_message);
+      throw new Error('장소 상세 정보 조회에 실패했습니다.');
+    }
+
+    const location = response.data.result.geometry.location;
+
+    return {
+      latitude: location.lat,
+      longitude: location.lng,
+    };
+
+  } catch (error) {
+    console.error('Places Details API 호출 실패:', error);
+    throw new Error('위치 좌표를 가져오는 중 오류가 발생했습니다.');
+  }
 };
+
+// 🚨 참고: 이전의 mockGeocode 함수는 이 파일에서 제거되었습니다.
+
+
+
+// =========================================================================
+// 5. 게시글 및 기타 API (Mock 유지)
+// =========================================================================
+
+//사용자 위치 정보 저장 (Mock)
+export const saveUserLocation = (memberName: string, location: { latitude: number; longitude: number }): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        const user = mockUsers.find(u => u.memberName === memberName);
+        if (user) {
+          user.location = location;
+          console.log(`Mock: User ${memberName} location saved:`, location);
+          resolve();
+        } else {
+          const newUser: User = { memberName, email: '', location };
+          mockUsers.push(newUser);
+          console.log(`Mock: New user ${memberName} created and location saved:`, location);
+          resolve();
+        }
+      }, 500);
+    });
+  };
+  
+  // 푸시 토큰 저장 (Mock)
+  export const savePushToken = (memberName: string, pushToken: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        const user = mockUsers.find(u => u.memberName === memberName);
+        if (user) {
+          user.pushToken = pushToken;
+          console.log(`Mock: User ${memberName} push token saved: ${pushToken}`);
+          resolve();
+        } else {
+          const newUser: User = { memberName, email: '', pushToken };
+          mockUsers.push(newUser);
+          console.log(`Mock: New user ${memberName} created and push token saved: ${pushToken}`);
+          resolve();
+        }
+      }, 500);
+    });
+  };
 
 // 게시글 목록 가져오기 (Mock)
 export const getPosts = (type: 'lost' | 'witnessed'): Promise<Post[]> => {
@@ -632,15 +691,22 @@ export const getPostsByUserId = (userMemberName: string): Post[] => {
   return mockPosts.filter(post => post.userMemberName === userMemberName);
 };
 
-// 새 게시글 추가 (Mock)
-export const addPost = (post: Omit<Post, 'id' | 'uploadedAt' | 'userMemberName'>, userMemberName: string): Post => {
+// 새 게시글 추가 (Mock - latitude, longitude를 PostPayload에서 받도록 수정)
+export const addPost = (post: PostPayload, userMemberName: string): Post => {
+  
+  // Post 타입에 필수인 'status' 필드를 post.type에 따라 명시적으로 추가합니다.
+  // PostPayload 타입이 Post의 모든 필드(status 제외)를 가지고 있다고 가정합니다.
+  const initialStatus: Post['status'] = post.type === 'lost' ? '실종' : '목격';
+  
   const newPost: Post = {
-    ...post,
+    // PostPayload가 가진 모든 속성
+    ...post, 
+    // Post 타입에 필요한 추가 속성
     id: generateUniqueId('post'),
     uploadedAt: new Date().toISOString(),
-    latitude: 37.5665,
-    longitude: 126.9780,
-    userMemberName: userMemberName, // userMemberName으로 통일
+    userMemberName: userMemberName,
+    // 누락된 status 속성을 추가하여 Post 타입을 만족시킵니다.
+    status: initialStatus, 
   };
   mockPosts.unshift(newPost);
   return newPost;
@@ -681,45 +747,6 @@ export const getColorList = () => {
     '회색',
     '여러 색'
   ];
-};
-
-// 주소를 위/경도로 변환 (가상 Mock)
-export const mockGeocode = (address: string): GeocodeResult[] => {
-  console.log('주소를 위도/경도로 변환합니다...', address);
-  const results = [];
-  if (address.includes('강남')) {
-    results.push({
-      id: generateUniqueId('geocode'),
-      address: '서울특별시 강남구',
-      latitude: 37.4979,
-      longitude: 127.0276,
-    });
-  }
-  if (address.includes('신사')) {
-    results.push({
-      id: generateUniqueId('geocode'),
-      address: '서울특별시 강남구 신사동',
-      latitude: 37.5218,
-      longitude: 127.0229,
-    });
-  }
-  if (address.includes('홍대')) {
-    results.push({
-      id: generateUniqueId('geocode'),
-      address: '서울특별시 마포구 서교동',
-      latitude: 37.557,
-      longitude: 126.925,
-    });
-  }
-  if (address.includes('가천대학교') || address.includes('가천대')) {
-    results.push({
-      id: generateUniqueId('geocode'),
-      address: '경기도 성남시 수정구 성남대로 1342 (가천대학교)',
-      latitude: 37.4509,
-      longitude: 127.1293,
-    });
-  }
-  return results;
 };
 
 // 특정 게시물에 대한 매칭 목록 가져오기 (Mock)
@@ -856,13 +883,9 @@ export const sendMessage = (roomId: string, messageData: { text?: string, imageU
 
 // 사용자 memberName으로 사용자 이름 가져오기 (Mock)
 export const getUserName = (userMemberName: string): string => {
-  // 실제 로그인 연동 후에는 AuthContext의 memberName이 곧 닉네임이므로
-  // Mock 데이터를 조회할 필요 없이 바로 그 값을 사용합니다.
   if (userMemberName && userMemberName !== '') {
-    return userMemberName; // ✅ 유효한 memberName(닉네임)을 바로 반환
+    return userMemberName;
   }
-  
-  // 로그인되지 않았거나 memberName이 없다면 대체 텍스트 반환
   return '알 수 없는 사용자';
 };
 // 새로운 매칭 수 가져오기 (Mock)
@@ -891,17 +914,14 @@ export const getNotifications = (): Promise<Notification[]> => {
 export const getConnectedPosts = (postId: string): Post[] => {
   const connectedPosts: Post[] = [];
   
-  // 위치 업로드 기록이 있는 채팅방들을 찾아서 연결된 게시글들 수집
   Object.values(mockChatRooms).forEach(room => {
     if (room.postId === postId) {
-      // 이 채팅방에서 위치 업로드가 있었는지 확인
       const messages = mockChatMessages[room.id] || [];
       const hasLocationUpdate = messages.some(msg => 
         msg.text && msg.text.includes('위치 정보가 업데이트되었습니다')
       );
       
       if (hasLocationUpdate) {
-        // 연결된 다른 게시글 찾기
         const otherRooms = Object.values(mockChatRooms).filter(otherRoom => 
           otherRoom.id !== room.id && 
           otherRoom.participants.some(participant => 
@@ -953,19 +973,14 @@ export const sendWitnessReport = (roomId: string, reportData: {
       }
     };
 
-    console.log('생성된 목격 제보 메시지:', newMessage);
-
     if (!mockChatMessages[roomId]) {
       mockChatMessages[roomId] = [];
     }
     mockChatMessages[roomId].push(newMessage);
 
-    console.log('저장된 메시지들:', mockChatMessages[roomId]);
-
     room.lastMessage = '📍 목격 제보가 도착했습니다';
     room.lastMessageTime = new Date().toISOString();
 
-    // 다른 참가자의 읽지 않은 메시지 수 증가
     const otherParticipantMemberName = room.participants.find(p => p !== senderMemberName);
     if (otherParticipantMemberName && room.unreadCounts[otherParticipantMemberName] !== undefined) {
       room.unreadCounts[otherParticipantMemberName]++;

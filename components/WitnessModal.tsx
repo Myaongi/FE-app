@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, TextInput, TouchableOpacity, TouchableWithoutFeedback, FlatList, Platform } from 'react-native';
 import MapViewComponent from './MapViewComponent';
-import { mockGeocode } from '../service/mockApi';
+import { geocodeAddress } from '../service/mockApi';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { GeocodeResult } from '../types';
 
@@ -52,11 +52,17 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
   const showDatePicker = () => showMode('date');
   const showTimePicker = () => showMode('time');
 
-  const handleLocationSearch = (text: string) => {
+  const handleLocationSearch = async (text: string) => { // 🚨 async 추가
     setWitnessLocation(text);
     if (text.length > 1) {
-      const results = mockGeocode(text);
-      setSearchResults(results);
+      try {
+        // 🚨 수정: geocodeAddress 호출
+        const results = await geocodeAddress(text); 
+        setSearchResults(results);
+      } catch (error) {
+        console.error('위치 검색 중 오류 발생:', error);
+        setSearchResults([]); // 오류 시 검색 결과 초기화
+      }
     } else {
       setSearchResults([]);
     }
