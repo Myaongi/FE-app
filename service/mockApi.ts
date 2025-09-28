@@ -99,6 +99,7 @@ apiClient.interceptors.response.use(
 let idCounter = 1;
 const generateUniqueId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${idCounter++}`;
 
+// memberName으로 통일
 const mockUsers: User[] = [
   { memberName: '멍멍이주인1', email: 'owner1@test.com', password: 'password1' },
   { memberName: '멍멍이목격1', email: 'witness1@test.com', password: 'password1' },
@@ -114,10 +115,11 @@ const mockUsers: User[] = [
   { memberName: '멍멍이목격6', email: 'witness6@test.com', password: 'password6' },
 ];
 
+// 필드명을 userMemberName으로 통일
 const mockPosts: Post[] = [
   {
     id: '1',
-    userMemberName: '멍멍이주인1',
+    userMemberName: '멍멍이주인1', // userMemberName으로 통일
     type: 'lost',
     title: '동네에서 강아지를 잃어버렸어요',
     species: '푸들',
@@ -135,7 +137,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '2',
-    userMemberName: '멍멍이목격1',
+    userMemberName: '멍멍이목격1', // userMemberName으로 통일
     type: 'witnessed',
     title: '산책하다가 길 잃은 강아지를 봤어요',
     species: '포메라니안',
@@ -153,7 +155,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '3',
-    userMemberName: '멍멍이주인2',
+    userMemberName: '멍멍이주인2', // userMemberName으로 통일
     type: 'lost',
     title: '우리 아치 어딨어요',
     species: '말티푸',
@@ -171,7 +173,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '4',
-    userMemberName: '멍멍이목격2',
+    userMemberName: '멍멍이목격2', // userMemberName으로 통일
     type: 'witnessed',
     title: '공원에서 혼자 다니는 강아지',
     species: '말티푸',
@@ -189,7 +191,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '5',
-    userMemberName: '멍멍이주인3',
+    userMemberName: '멍멍이주인3', // userMemberName으로 통일
     type: 'lost',
     title: '활발한 시바견이 안 보여요',
     species: '시바견',
@@ -207,7 +209,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '6',
-    userMemberName: '멍멍이목격3',
+    userMemberName: '멍멍이목격3', // userMemberName으로 통일
     type: 'witnessed',
     title: '주변을 배회하는 푸들',
     species: '푸들',
@@ -225,7 +227,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '7',
-    userMemberName: '멍멍이주인4',
+    userMemberName: '멍멍이주인4', // userMemberName으로 통일
     type: 'lost',
     title: '작고 귀여운 푸들 찾아주세요',
     species: '푸들',
@@ -243,7 +245,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '8',
-    userMemberName: '멍멍이목격4',
+    userMemberName: '멍멍이목격4', // userMemberName으로 통일
     type: 'witnessed',
     title: '주인 없는 비숑을 보았습니다',
     species: '비숑',
@@ -261,7 +263,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '9',
-    userMemberName: '멍멍이주인5',
+    userMemberName: '멍멍이주인5', // userMemberName으로 통일
     type: 'lost',
     title: '말티즈를 찾아요',
     species: '말티즈',
@@ -279,7 +281,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '10',
-    userMemberName: '멍멍이목격5',
+    userMemberName: '멍멍이목격5', // userMemberName으로 통일
     type: 'witnessed',
     title: '공원 벤치에 혼자 있는 강아지',
     species: '닥스훈트',
@@ -297,7 +299,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '11',
-    userMemberName: '멍멍이주인6',
+    userMemberName: '멍멍이주인6', // userMemberName으로 통일
     type: 'lost',
     title: '우리 아기 강아지 찾아주세요',
     species: '시바견',
@@ -315,7 +317,7 @@ const mockPosts: Post[] = [
   },
   {
     id: '12',
-    userMemberName: '멍멍이목격6',
+    userMemberName: '멍멍이목격6', // userMemberName으로 통일
     type: 'witnessed',
     title: '겁에 질려있는 작은 강아지 목격',
     species: '치와와',
@@ -436,7 +438,7 @@ const mockNotifications: Notification[] = [
   },
 ];
 
-// 로그인 함수
+// 로그인 함수 (실제 API)
 export const login = async (payload: LoginPayload): Promise<ApiResponse<AuthResult>> => {
   try {
     const response = await apiClient.post('/login', {
@@ -457,9 +459,11 @@ export const login = async (payload: LoginPayload): Promise<ApiResponse<AuthResu
       }
       return apiResponse;
     } else {
+      // 백엔드 에러 메시지를 포함한 에러를 throw
       throw new Error(apiResponse.message);
     }
   } catch (error: any) {
+    // 백엔드 에러 응답에서 메시지를 추출하여 throw
     if (error.response?.data?.message) {
       throw new Error(error.response.data.message);
     } else if (error.message) {
@@ -470,7 +474,7 @@ export const login = async (payload: LoginPayload): Promise<ApiResponse<AuthResu
   }
 };
 
-// 회원가입 함수
+// 회원가입 함수 (실제 API)
 export const signup = async (payload: SignUpPayload): Promise<ApiResponse<null>> => {
   console.log('📝 [SIGNUP] 회원가입 시도 시작:', { 
     memberName: payload.memberName, 
@@ -502,17 +506,8 @@ export const signup = async (payload: SignUpPayload): Promise<ApiResponse<null>>
     const response = await apiClient.post('/signup', requestData);
     
     console.log('✅ [SIGNUP] API 응답 받음:', response.data);
-    console.log('🔍 [SIGNUP] 응답 상태:', response.status);
-    console.log('🔍 [SIGNUP] 응답 헤더:', response.headers);
     
     const apiResponse: ApiResponse<null> = response.data;
-    
-    console.log('📊 [SIGNUP] 응답 구조 분석:', {
-      isSuccess: apiResponse.isSuccess,
-      code: apiResponse.code,
-      message: apiResponse.message,
-      result: apiResponse.result
-    });
     
     if (apiResponse.isSuccess) {
       console.log('🎉 [SIGNUP] 회원가입 성공');
@@ -523,18 +518,8 @@ export const signup = async (payload: SignUpPayload): Promise<ApiResponse<null>>
     }
   } catch (error: any) {
     console.log('🚨 [SIGNUP] 에러 발생:', error);
-    console.log('🚨 [SIGNUP] 에러 상세:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      config: {
-        url: error.config?.url,
-        method: error.config?.method,
-        data: error.config?.data
-      }
-    });
     
+    // 백엔드 에러 응답에서 메시지를 추출하여 throw
     if (error.response?.data?.message) {
       throw new Error(error.response.data.message);
     } else if (error.message) {
@@ -545,7 +530,7 @@ export const signup = async (payload: SignUpPayload): Promise<ApiResponse<null>>
   }
 };
 
-// 토큰 리프레시 함수
+// 토큰 리프레시 함수 (실제 API)
 export const refreshToken = async (): Promise<ApiResponse<AuthResult>> => {
   try {
     const response = await apiClient.post('/refresh');
@@ -576,7 +561,7 @@ export const refreshToken = async (): Promise<ApiResponse<AuthResult>> => {
   }
 };
 
-//사용자 위치 정보 저장
+//사용자 위치 정보 저장 (Mock)
 export const saveUserLocation = (memberName: string, location: { latitude: number; longitude: number }): Promise<void> => {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -597,7 +582,7 @@ export const saveUserLocation = (memberName: string, location: { latitude: numbe
   });
 };
 
-// 푸시 토큰 저장 
+// 푸시 토큰 저장 (Mock)
 export const savePushToken = (memberName: string, pushToken: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -618,7 +603,7 @@ export const savePushToken = (memberName: string, pushToken: string): Promise<vo
   });
 };
 
-// 게시글 목록 가져오기
+// 게시글 목록 가져오기 (Mock)
 export const getPosts = (type: 'lost' | 'witnessed'): Promise<Post[]> => {
   return new Promise((resolve) => {
     const filteredPosts = mockPosts.filter(post => post.type === type);
@@ -628,7 +613,7 @@ export const getPosts = (type: 'lost' | 'witnessed'): Promise<Post[]> => {
   });
 };
 
-// 매칭 목록 가져오기
+// 매칭 목록 가져오기 (Mock)
 export const getMatches = (): Promise<Match[]> => {
   return new Promise((resolve) => {
     setTimeout(() => {
@@ -637,17 +622,17 @@ export const getMatches = (): Promise<Match[]> => {
   });
 };
 
-// 게시글 상세 정보 가져오기
+// 게시글 상세 정보 가져오기 (Mock)
 export const getPostById = (id: string): Post | undefined => {
   return mockPosts.find(post => post.id === id);
 };
 
-// 사용자 닉네임으로 게시글 목록 가져오기
+// 사용자 memberName으로 게시글 목록 가져오기 (Mock)
 export const getPostsByUserId = (userMemberName: string): Post[] => {
   return mockPosts.filter(post => post.userMemberName === userMemberName);
 };
 
-// 새 게시글 추가
+// 새 게시글 추가 (Mock)
 export const addPost = (post: Omit<Post, 'id' | 'uploadedAt' | 'userMemberName'>, userMemberName: string): Post => {
   const newPost: Post = {
     ...post,
@@ -655,12 +640,12 @@ export const addPost = (post: Omit<Post, 'id' | 'uploadedAt' | 'userMemberName'>
     uploadedAt: new Date().toISOString(),
     latitude: 37.5665,
     longitude: 126.9780,
-    userMemberName: userMemberName,
+    userMemberName: userMemberName, // userMemberName으로 통일
   };
   mockPosts.unshift(newPost);
   return newPost;
 };
-// 종 목록 가져오기 (자동완성용)
+// 종 목록 가져오기 (Mock)
 export const getSpeciesList = () => {
   return [
     '말티즈',
@@ -677,7 +662,7 @@ export const getSpeciesList = () => {
   ];
 };
 
-// 품종 자동완성 검색
+// 품종 자동완성 검색 (Mock)
 export const searchSpecies = (query: string) => {
   const allSpecies = getSpeciesList();
   if (query.length < 2) return [];
@@ -687,7 +672,7 @@ export const searchSpecies = (query: string) => {
   );
 };
 
-// 색상 목록 가져오기
+// 색상 목록 가져오기 (Mock)
 export const getColorList = () => {
   return [
     '갈색',
@@ -698,7 +683,7 @@ export const getColorList = () => {
   ];
 };
 
-// 주소를 위/경도로 변환 (가상)
+// 주소를 위/경도로 변환 (가상 Mock)
 export const mockGeocode = (address: string): GeocodeResult[] => {
   console.log('주소를 위도/경도로 변환합니다...', address);
   const results = [];
@@ -737,7 +722,7 @@ export const mockGeocode = (address: string): GeocodeResult[] => {
   return results;
 };
 
-// 특정 게시물에 대한 매칭 목록 가져오기
+// 특정 게시물에 대한 매칭 목록 가져오기 (Mock)
 export const getMatchesForPost = (postId: string): Promise<Match[]> => {
     return new Promise((resolve) => {
         const originalPost = mockPosts.find(post => post.id === postId);
@@ -757,7 +742,7 @@ export const getMatchesForPost = (postId: string): Promise<Match[]> => {
     });
 };
 
-// 게시물 상태 업데이트
+// 게시물 상태 업데이트 (Mock)
 export const updatePostStatus = (postId: string, newStatus: Post['status']): Promise<Post> => {
     return new Promise((resolve, reject) => {
         const postToUpdate = mockPosts.find(post => post.id === postId);
@@ -773,7 +758,7 @@ export const updatePostStatus = (postId: string, newStatus: Post['status']): Pro
     });
 };
 
-// 사용자 닉네임으로 채팅방 목록 가져오기
+// 사용자 memberName으로 채팅방 목록 가져오기 (Mock)
 export const getChatRoomsByUserId = (userMemberName: string): Promise<ChatRoom[]> => {
   return new Promise((resolve) => {
     const userChats = mockChatRooms.filter(room =>
@@ -783,7 +768,7 @@ export const getChatRoomsByUserId = (userMemberName: string): Promise<ChatRoom[]
   });
 };
 
-// 채팅방 ID로 채팅방 정보 가져오기
+// 채팅방 ID로 채팅방 정보 가져오기 (Mock)
 export const getChatRoomById = (roomId: string): Promise<ChatRoom | undefined> => {
   return new Promise((resolve) => {
     const room = mockChatRooms.find(room => room.id === roomId);
@@ -791,20 +776,20 @@ export const getChatRoomById = (roomId: string): Promise<ChatRoom | undefined> =
   });
 };
 
-// 새 채팅방 생성
+// 새 채팅방 생성 (Mock)
 export const createChatRoom = (
   postId: string,
-  participantNicknames: string[],
+  participantMemberNames: string[], // memberName으로 통일
   context: ChatRoom['chatContext']
 ): Promise<ChatRoom> => {
   return new Promise((resolve, reject) => {
     const newRoom: ChatRoom = {
       id: generateUniqueId('chat'),
-      participants: participantNicknames,
+      participants: participantMemberNames,
       postId,
       lastMessage: '',
       lastMessageTime: new Date().toISOString(),
-      unreadCounts: participantNicknames.reduce((acc, nickname) => ({ ...acc, [nickname]: 0 }), {}),
+      unreadCounts: participantMemberNames.reduce((acc, memberName) => ({ ...acc, [memberName]: 0 }), {}),
       chatContext: context,
     };
     mockChatRooms.push(newRoom);
@@ -812,7 +797,7 @@ export const createChatRoom = (
   });
 };
 
-// 채팅방 메시지 읽음 처리
+// 채팅방 메시지 읽음 처리 (Mock)
 export const readChatRoom = (roomId: string, userMemberName: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     const roomToUpdate = mockChatRooms.find(room => room.id === roomId);
@@ -826,7 +811,7 @@ export const readChatRoom = (roomId: string, userMemberName: string): Promise<vo
   });
 };
 
-// 채팅방 ID로 메시지 목록 가져오기
+// 채팅방 ID로 메시지 목록 가져오기 (Mock)
 export const getMessagesByRoomId = (roomId: string): Promise<Message[]> => {
   return new Promise((resolve) => {
     const messages = mockChatMessages[roomId] || [];
@@ -834,7 +819,7 @@ export const getMessagesByRoomId = (roomId: string): Promise<Message[]> => {
   });
 };
 
-// 메시지 전송
+// 메시지 전송 (Mock)
 export const sendMessage = (roomId: string, messageData: { text?: string, imageUrl?: string }, senderMemberName: string): Promise<Message> => {
   return new Promise((resolve, reject) => {
     const room = mockChatRooms.find(r => r.id === roomId);
@@ -869,13 +854,18 @@ export const sendMessage = (roomId: string, messageData: { text?: string, imageU
   });
 };
 
-// 사용자 닉네임으로 사용자 이름 가져오기
+// 사용자 memberName으로 사용자 이름 가져오기 (Mock)
 export const getUserName = (userMemberName: string): string => {
-  const user = mockUsers.find(u => u.memberName === userMemberName);
-  return user ? user.memberName : '알 수 없는 사용자';
+  // 실제 로그인 연동 후에는 AuthContext의 memberName이 곧 닉네임이므로
+  // Mock 데이터를 조회할 필요 없이 바로 그 값을 사용합니다.
+  if (userMemberName && userMemberName !== '') {
+    return userMemberName; // ✅ 유효한 memberName(닉네임)을 바로 반환
+  }
+  
+  // 로그인되지 않았거나 memberName이 없다면 대체 텍스트 반환
+  return '알 수 없는 사용자';
 };
-
-// 새로운 매칭 수 가져오기
+// 새로운 매칭 수 가져오기 (Mock)
 export const getNewMatchCount = (): Promise<number> => {
   return new Promise((resolve) => {
     const newMatches = 2;
@@ -885,7 +875,7 @@ export const getNewMatchCount = (): Promise<number> => {
   });
 };
 
-// 알림 목록 가져오기
+// 알림 목록 가져오기 (Mock)
 export const getNotifications = (): Promise<Notification[]> => {
   return new Promise((resolve) => {
     const sortedNotifications = [...mockNotifications].sort((a, b) => 
@@ -897,8 +887,7 @@ export const getNotifications = (): Promise<Notification[]> => {
   });
 };
 
-// 목격 제보 메시지 전송 (시뮬레이션용)
-// 연결된 게시글들 찾기 (위치 업로드 기록이 있는 게시글들)
+// 연결된 게시글들 찾기 (Mock)
 export const getConnectedPosts = (postId: string): Post[] => {
   const connectedPosts: Post[] = [];
   
@@ -933,6 +922,7 @@ export const getConnectedPosts = (postId: string): Post[] => {
   return connectedPosts;
 };
 
+// 목격 제보 메시지 전송 (Mock)
 export const sendWitnessReport = (roomId: string, reportData: {
   witnessLocation: string;
   witnessTime: string;
@@ -974,6 +964,12 @@ export const sendWitnessReport = (roomId: string, reportData: {
 
     room.lastMessage = '📍 목격 제보가 도착했습니다';
     room.lastMessageTime = new Date().toISOString();
+
+    // 다른 참가자의 읽지 않은 메시지 수 증가
+    const otherParticipantMemberName = room.participants.find(p => p !== senderMemberName);
+    if (otherParticipantMemberName && room.unreadCounts[otherParticipantMemberName] !== undefined) {
+      room.unreadCounts[otherParticipantMemberName]++;
+    }
 
     resolve(newMessage);
   });

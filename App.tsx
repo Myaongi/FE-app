@@ -159,6 +159,9 @@ function MainAppStackScreen() {
 }
 
 export default function App() {
+  // 1. 상태 초기화 시점
+  // AsyncStorage에서 저장된 닉네임이 있다면 그것을 userMemberName의 초기값으로 사용해야 합니다.
+  // 이 로직은 복잡해질 수 있으므로, 초기화보다는 로그인 후 'memberName'을 명시적으로 넣어주는 부분에 집중합니다.
   const [auth, setAuth] = useState<{ isLoggedIn: boolean; userMemberName: string | null }>({
     isLoggedIn: false,
     userMemberName: null,
@@ -170,13 +173,13 @@ export default function App() {
   
   const authContext = useMemo(() => ({
     signIn: (memberName: string) => {
+      // ✅ signIn 시 memberName이 null이 아닌 문자열로 확실히 저장되도록 합니다.
       setAuth({ isLoggedIn: true, userMemberName: memberName });
     },
     signOut: () => setAuth({ isLoggedIn: false, userMemberName: null }),
     isLoggedIn: auth.isLoggedIn,
     userMemberName: auth.userMemberName,
   }), [auth]);
-
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', handleAppStateChange);

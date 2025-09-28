@@ -109,7 +109,7 @@ export interface Post {
   uploadedAt: string;
   latitude: number;
   longitude: number;
-  userMemberName: string;
+  userMemberName: string; // ✅ usermemberName -> userMemberName으로 수정
   photos?: string[];
 }
 
@@ -141,7 +141,7 @@ export interface ChatRoom {
   postId: string;
   lastMessage: string;
   lastMessageTime: string;
-  unreadCounts: { [nickname: string]: number };
+  unreadCounts: { [memberName: string]: number }; // ✅ 키를 memberName으로 변경 (일관성 유지)
   chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
 }
 

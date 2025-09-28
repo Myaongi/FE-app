@@ -140,7 +140,7 @@ const ChatDetailScreen = () => {
 
 
   const renderMessage = ({ item }: { item: Message }) => {
-    const isMyMessage = item.senderNickname === currentUserId;
+    const isMyMessage = item.senderMemberName === currentUserId;
     console.log('렌더링할 메시지:', item);
 
     if (item.type === 'witness_report') {
