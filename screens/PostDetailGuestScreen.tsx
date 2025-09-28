@@ -1,14 +1,25 @@
-import { useNavigation, useRoute } from '@react-navigation/native';
+// PostDetailGuestScreen.tsx
+
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import React from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { 
+  Alert, 
+  StyleSheet, 
+  Text, 
+  TouchableOpacity, 
+  View,
+  SafeAreaView
+} from 'react-native';
 import PostDetailContent from '../components/PostDetailContent';
 import { getPostById } from '../service/mockApi';
-import { Post, StackNavigation } from '../types';
+import { Post, AuthStackParamList, StackNavigation } from '../types';
+
+type PostDetailGuestRouteProp = RouteProp<AuthStackParamList, 'PostDetailGuest'>;
 
 const PostDetailGuestScreen = () => {
-  const route = useRoute();
+  const route = useRoute<PostDetailGuestRouteProp>();
   const navigation = useNavigation<StackNavigation>();
-  const { id } = route.params as { id: string };
+  const { id } = route.params;
   const [post, setPost] = React.useState<Post | null>(null);
 
   React.useLayoutEffect(() => {
@@ -16,12 +27,9 @@ const PostDetailGuestScreen = () => {
   }, [navigation]);
 
   const fetchPost = React.useCallback(async () => {
-    console.log('fetchPost 호출됨, id:', id);
     const fetchedPost = getPostById(id);
-    console.log('가져온 게시물:', fetchedPost);
     if (fetchedPost) {
       setPost(fetchedPost);
-      console.log('게시물 상태 설정 완료');
     }
   }, [id]);
 
@@ -30,8 +38,6 @@ const PostDetailGuestScreen = () => {
   }, [fetchPost]);
   
   const requireLoginAlert = () => {
-    console.log('requireLoginAlert 호출됨, post type:', post?.type);
-    // 게스트는 모든 기능에 로그인이 필요
     Alert.alert(
       '로그인이 필요합니다',
       '해당 기능은 로그인이 필요합니다. 로그인 페이지로 이동하시겠습니까?',
@@ -53,73 +59,90 @@ const PostDetailGuestScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* 1. 상단 게시글 타입 표시 컨테이너 추가 */}
-      <View style={styles.postTypeContainer}>
+      
+      {/* 🚨 상단 헤더 영역 복구 및 중앙 정렬 수정 */}
+      <View style={styles.headerContainer}>
+        {/* 🚨 왼쪽 공간 확보 (BackButton이 없으므로 더미를 넣습니다) */}
+        {/* PostDetailContent의 TopNavBar와 너비를 맞추기 위해 투명한 더미를 넣습니다. */}
+        <View style={styles.headerDummySpace} /> 
+        
         <Text style={styles.postTypeText}>
-          {/* 텍스트만 표시하고 중앙 정렬 */}
           {post.type === 'lost' ? '잃어버렸어요' : '발견했어요'}
         </Text>
-        {/* 게스트 화면이므로 수정/삭제 버튼은 렌더링하지 않음 */}
+        
+        {/* 🚨 오른쪽 공간 확보 (PostDetailContent의 RightSection과 너비를 맞춥니다) */}
+        <View style={styles.headerDummySpace} /> 
       </View>
-
-      {/* 2. PostDetailContent로 나머지 내용 래핑 */}
+      
       <PostDetailContent post={post} isGuest={true}>
-        {post.status === '귀가 완료' ? (
-          <View style={styles.expiredPostContainer}>
-            <Text style={styles.expiredPostText}>이 게시물은 귀가 완료되었습니다.</Text>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={styles.bottomButton}
-            onPress={() => {
-              console.log('버튼 클릭됨, post:', post);
-              console.log('post.type:', post?.type);
-              requireLoginAlert();
-            }}
-          >
-            <Text style={styles.bottomButtonText}>
-              {post.type === 'lost' ? '목격했어요' : '1:1 채팅하기'}
-            </Text>
-          </TouchableOpacity>
-        )}
+        <SafeAreaView style={styles.bottomArea}>
+          {post.status === '귀가 완료' ? (
+            <View style={styles.expiredPostContainer}>
+              <Text style={styles.expiredPostText}>이 게시물은 귀가 완료되었습니다.</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.bottomButton}
+              onPress={() => {
+                requireLoginAlert();
+              }}
+            >
+              <Text style={styles.bottomButtonText}>
+                {post.type === 'lost' ? '목격했어요' : '1:1 채팅하기'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </SafeAreaView>
       </PostDetailContent>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { // 전체 화면 View를 래핑하기 위해 추가
+  container: {
     flex: 1,
     backgroundColor: '#fff',
   },
-  // 1. PostDetailScreen에서 가져온 스타일 추가
-  postTypeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center', 
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#fff', 
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-    marginTop: 40, 
-  },
-  postTypeText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  // 2. 기존 스타일 유지
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  bottomButton: {
+  // 🚨 상단 헤더 스타일 수정
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between', // 양 끝으로 밀어내고
+    alignItems: 'center',
+    paddingHorizontal: 16, // PostDetailContent의 navIcon, reportButton과 패딩 통일
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+    marginTop: 40,
+  },
+  postTypeText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    // flexGrow를 주지 않아 중앙에 고정되도록 합니다.
+  },
+  // 🚨 더미 공간 스타일 추가 (PostDetailContent의 아이콘 영역과 너비를 맞춥니다.)
+  headerDummySpace: {
+    width: 40, // BackIcon, ReportButton 영역의 대략적인 크기 (패딩 포함)
+    height: 24, // 텍스트와 높이 맞춤
+  },
+  // 🚨 하단 버튼 영역 스타일
+  bottomArea: {
     position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    paddingTop: 10,
+    paddingBottom: 20, 
+  },
+  bottomButton: {
+    marginHorizontal: 20,
     backgroundColor: '#FF8C00',
     paddingVertical: 15,
     borderRadius: 10,
@@ -131,10 +154,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   expiredPostContainer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
+    marginHorizontal: 20,
     backgroundColor: '#D3D3D3',
     paddingVertical: 15,
     borderRadius: 10,

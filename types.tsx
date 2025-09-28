@@ -1,6 +1,7 @@
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
+import { NavigationProp } from '@react-navigation/native'; // 🚨 추가: NavigationProp을 명시적으로 import합니다.
 
 // =========================================================================
 // 네비게이션 타입 정의
@@ -17,7 +18,12 @@ export type RootTabParamList = {
 // 메인 Stack 네비게이션의 파라미터 목록 (로그인 후 접근)
 export type RootStackParamList = {
   RootTab: NavigatorScreenParams<RootTabParamList>;
-  PostDetail: { id: string; isMyPost?: boolean };
+  // 🚨 필수 수정: PostDetail 파라미터에 localPhotos 필드 추가
+  PostDetail: { 
+    id: string; 
+    isMyPost?: boolean; 
+    localPhotos?: string[]; // 👈 추가됨: 백엔드 연동 전까지 이미지 URI를 직접 전달
+  };
   WritePostScreen: { 
     type: 'lost' | 'witnessed';
     editMode?: boolean;
@@ -129,7 +135,8 @@ export interface Post {
   latitude: number; // 지도 검색으로 얻은 위도
   longitude: number; // 지도 검색으로 얻은 경도
   userMemberName: string;
-  photos?: string[];
+  // 🚨 필수 수정: 이미지 URI 배열 필드 추가
+  photos?: string[]; 
 }
 
 /**

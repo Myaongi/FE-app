@@ -15,10 +15,33 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-// 🚨 수정: getCoordinatesByPlaceId 함수를 추가 import 합니다.
-import { addPost, getColorList, getPostById, getSpeciesList, geocodeAddress, getCoordinatesByPlaceId, searchSpecies } from '../service/mockApi'; 
-import { Post, GeocodeResult } from '../types'; 
+import {
+  addPost,
+  getColorList,
+  getPostById,
+  getSpeciesList,
+  geocodeAddress,
+  getCoordinatesByPlaceId,
+  searchSpecies,
+  updatePost,
+} from '../service/mockApi';
+import { Post, GeocodeResult, PostPayload } from '../types'; 
 import MapViewComponent from './MapViewComponent';
+
+// 🚨 WritePostForm 내부에서만 사용되는 타입 정의 (any 오류 최종 해결용)
+interface MarkerCoords {
+    latitude: number;
+    longitude: number;
+    title: string;
+    description?: string;
+}
+interface MapRegion {
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+}
+
 
 interface WritePostFormProps {
   type: 'lost' | 'witnessed';
@@ -42,7 +65,13 @@ const mockAiImageGeneration = (details: any) => {
   return 'https://via.placeholder.com/300/66ccff/ffffff?text=AI+Generated+Pet';
 };
 
-const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMemberName, editMode = false, postId }) => {
+const WritePostForm: React.FC<WritePostFormProps> = ({
+  type,
+  onSubmit,
+  userMemberName,
+  editMode = false,
+  postId,
+}) => {
   const [form, setForm] = useState({
     title: '',
     species: '',
@@ -69,15 +98,15 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
   const [showSpeciesSuggestions, setShowSpeciesSuggestions] = useState(false);
 
   // 지도 초기 영역 설정 (마커가 없더라도 기본적으로 서울 중앙에 위치)
-  const [mapRegion, setMapRegion] = useState({
+  const [mapRegion, setMapRegion] = useState<MapRegion>({ // 🚨 타입 적용
     latitude: 37.5665,
     longitude: 126.9780,
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   });
 
-  const [markerCoordinates, setMarkerCoordinates] = useState<any | null>(null);
-  const [searchResults, setSearchResults] = useState<GeocodeResult[]>([]); 
+  const [markerCoordinates, setMarkerCoordinates] = useState<MarkerCoords | null>(null); // 🚨 타입 적용
+  const [searchResults, setSearchResults] = useState<GeocodeResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -99,8 +128,9 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
           time: new Date(existingPost.date),
           location: existingPost.location || '',
         });
-        setPhotos(existingPost.photos || []);
-        
+        // photos 상태 업데이트 (aiImage는 이 시점에 사용하지 않으므로 photos만 업데이트)
+        setPhotos(existingPost.photos || []); 
+
         // 지도 및 마커 상태 로드
         setMapRegion({
           latitude: existingPost.latitude,
@@ -118,19 +148,18 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
     }
   }, [editMode, postId]);
 
-
   const handleInputChange = (key: string, value: string) => {
     setForm(prevForm => ({ ...prevForm, [key]: value }));
   };
-  
+
   const handleColorSelect = (color: string) => {
     setForm(prevForm => ({ ...prevForm, color }));
     setShowColorPicker(false);
   };
-  
+
   const handleSearchQueryChange = async (value: string) => {
     setSearchQuery(value);
-    
+
     if (value.length > 1) {
       try {
         const results = await geocodeAddress(value);
@@ -146,44 +175,44 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
   };
 
   // 🚨 수정: 선택 시 2단계 (Details API 호출) 로직 추가
-  const handleLocationSelect = async (item: GeocodeResult) => { // async 추가
+  const handleLocationSelect = async (item: GeocodeResult) => {
+    // async 추가
     // 1단계: 검색 UI 닫고 주소 업데이트 (좌표는 아직 0이거나 null)
     setForm(prevForm => ({ ...prevForm, location: item.address }));
     setSearchQuery(item.address);
     setSearchResults([]);
     setIsSearching(false);
-    
+
     if (!item.id) {
-        Alert.alert('오류', '선택된 장소에 ID가 없어 좌표를 가져올 수 없습니다.');
-        return;
+      Alert.alert('오류', '선택된 장소에 ID가 없어 좌표를 가져올 수 없습니다.');
+      return;
     }
 
     try {
-        // 2단계: Place ID로 실제 좌표 조회
-        const coordinates = await getCoordinatesByPlaceId(item.id);
-        
-        // 3단계: 조회된 실제 좌표로 지도 상태 업데이트
-        setMapRegion({
-            latitude: coordinates.latitude,
-            longitude: coordinates.longitude,
-            latitudeDelta: 0.005,
-            longitudeDelta: 0.005,
-        });
-        setMarkerCoordinates({
-            latitude: coordinates.latitude,
-            longitude: coordinates.longitude,
-            title: item.address,
-            description: '선택된 장소',
-        });
-        
+      // 2단계: Place ID로 실제 좌표 조회
+      const coordinates = await getCoordinatesByPlaceId(item.id);
+
+      // 3단계: 조회된 실제 좌표로 지도 상태 업데이트
+      setMapRegion({
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      });
+      setMarkerCoordinates({
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        title: item.address,
+        description: '선택된 장소',
+      });
     } catch (error) {
-        console.error('좌표 조회 실패:', error);
-        Alert.alert('오류', '선택한 장소의 좌표를 가져오는 데 실패했습니다.');
-        // 좌표 획득 실패 시 마커 초기화
-        setMarkerCoordinates(null);
+      console.error('좌표 조회 실패:', error);
+      Alert.alert('오류', '선택한 장소의 좌표를 가져오는 데 실패했습니다.');
+      // 좌표 획득 실패 시 마커 초기화
+      setMarkerCoordinates(null);
     }
   };
-  
+
   const handleDateChange = (event: any, selectedDate?: Date) => {
     if (event.type === 'dismissed') {
       setShowDatePicker(false);
@@ -216,7 +245,7 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
   const handleSpeciesQueryChange = (query: string) => {
     setSpeciesQuery(query);
     setForm(prevForm => ({ ...prevForm, species: query }));
-    
+
     if (query.length >= 2) {
       const suggestions = searchSpecies(query);
       setSpeciesSuggestions(suggestions);
@@ -233,7 +262,10 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
 
   const renderDatePicker = () => (
     <Modal visible={showDatePicker} transparent animationType="fade">
-      <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowDatePicker(false)}>
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        onPress={() => setShowDatePicker(false)}
+      >
         <View style={styles.pickerContainer}>
           <DateTimePicker
             value={form.date}
@@ -251,7 +283,10 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
 
   const renderTimePicker = () => (
     <Modal visible={showTimePicker} transparent animationType="fade">
-      <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowTimePicker(false)}>
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        onPress={() => setShowTimePicker(false)}
+      >
         <View style={styles.pickerContainer}>
           <DateTimePicker
             value={form.time}
@@ -269,7 +304,10 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
 
   const renderSpeciesPicker = () => (
     <Modal visible={showSpeciesPicker} transparent animationType="fade">
-      <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowSpeciesPicker(false)}>
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        onPress={() => setShowSpeciesPicker(false)}
+      >
         <View style={styles.pickerListContainer}>
           {getSpeciesList().map((species, index) => (
             <TouchableOpacity
@@ -287,7 +325,10 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
 
   const renderColorPicker = () => (
     <Modal visible={showColorPicker} transparent animationType="fade">
-      <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowColorPicker(false)}>
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        onPress={() => setShowColorPicker(false)}
+      >
         <View style={styles.pickerListContainer}>
           {getColorList().map((color, index) => (
             <TouchableOpacity
@@ -311,7 +352,10 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
     >
       <View style={styles.modalContent}>
         <View style={styles.searchBarContainer}>
-          <TouchableOpacity onPress={() => setIsSearching(false)} style={styles.closeButton}>
+          <TouchableOpacity
+            onPress={() => setIsSearching(false)}
+            style={styles.closeButton}
+          >
             <Text style={styles.closeButtonText}>닫기</Text>
           </TouchableOpacity>
           <TextInput
@@ -324,13 +368,18 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
         </View>
         <FlatList
           data={searchResults}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.searchResultItem} onPress={() => handleLocationSelect(item)}>
+            <TouchableOpacity
+              style={styles.searchResultItem}
+              onPress={() => handleLocationSelect(item)}
+            >
               <Text>{item.address}</Text>
             </TouchableOpacity>
           )}
-          ListEmptyComponent={<Text style={styles.emptyText}>검색 결과가 없습니다.</Text>}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>검색 결과가 없습니다.</Text>
+          }
         />
       </View>
     </Modal>
@@ -397,55 +446,106 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
     setAiImageGenerating(false);
   };
 
-
   const currentUserId = userMemberName;
 
-  const handleSubmit = () => {
-  // 🚨 수정: markerCoordinates가 설정되었는지 확인
-  if (!markerCoordinates) {
-    Alert.alert('필수 정보 누락', '지도에서 정확한 장소를 검색하고 선택해 주세요.');
-    return;
-  }
-  
-  // 필수 정보 누락 체크 로직
-  if (
-    !form.title ||
-    !form.species ||
-    !form.color ||
-    !form.gender ||
-    !form.date ||
-    !form.time ||
-    !form.location ||
-    (type === 'lost' && !form.name) ||
-    (photos.length === 0 && !aiImage)
-  ) {
-    Alert.alert('필수 정보 누락', '모든 정보를 입력하고 사진을 추가해 주세요.');
-    return;
-  }
-  
-  // 🚨 수정: PostPayload 타입을 따르도록 객체 구조 변경 및 위도/경도 명시
-  const newPostPayload = {
-    type,
-    title: form.title,
-    species: form.species,
-    color: form.color,
-    location: form.location,
-    // 날짜와 시간을 합쳐서 ISOString으로 만듭니다.
-    date: new Date(form.date.getFullYear(), form.date.getMonth(), form.date.getDate(), form.time.getHours(), form.time.getMinutes()).toISOString(),
-    name: type === 'lost' ? form.name : undefined,
-    gender: form.gender,
-    features: form.features,
-    locationDetails: form.location, 
-    latitude: markerCoordinates.latitude, // 🚨 markerCoordinates 사용
-    longitude: markerCoordinates.longitude, // 🚨 markerCoordinates 사용
-    photos: photos.length > 0 ? photos : undefined, 
+  // 🚨 추가: 마커 드래그 종료 핸들러 (any 오류 최종 해결)
+  const handleMarkerDragEnd = (coordinate: { latitude: number; longitude: number }) => {
+      // 1. 마커 좌표 상태 업데이트
+      setMarkerCoordinates((prev: MarkerCoords | null) => { // 🚨 prev 타입 명시
+        if (!prev) return null;
+        return {
+            ...prev,
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+        };
+      });
+      
+      // 2. 지도 영역 상태도 업데이트 (마커가 중앙에 오도록)
+      setMapRegion((prev: MapRegion) => ({ // 🚨 prev 타입 명시
+          ...prev,
+          latitude: coordinate.latitude,
+          longitude: coordinate.longitude,
+      }));
+
+      Alert.alert("위치 업데이트", "마커를 드래그하여 위치가 수정되었습니다.");
   };
 
+  const handleSubmit = () => {
+    // 🚨 수정: markerCoordinates가 설정되었는지 확인
+    if (!markerCoordinates) {
+      Alert.alert('필수 정보 누락', '지도에서 정확한 장소를 검색하고 선택해 주세요.');
+      return;
+    }
 
-  const addedPost = addPost(newPostPayload, currentUserId);
+    // 필수 정보 누락 체크 로직
+    if (
+      !form.title ||
+      !form.species ||
+      !form.color ||
+      !form.gender ||
+      !form.date ||
+      !form.time ||
+      !form.location ||
+      (type === 'lost' && !form.name) ||
+      (photos.length === 0 && !aiImage)
+    ) {
+      Alert.alert('필수 정보 누락', '모든 정보를 입력하고 사진을 추가해 주세요.');
+      return;
+    }
 
-  onSubmit(addedPost);
-};
+    // --- 🚨 이미지 URI 배열 통합 ---
+    const photoUris = photos.length > 0 ? photos : aiImage ? [aiImage] : undefined;
+    // --- 🚨 이미지 URI 배열 통합 끝 ---
+
+    // PostPayload 객체 생성
+    const postPayload: PostPayload = {
+      type,
+      title: form.title,
+      species: form.species,
+      color: form.color,
+      location: form.location,
+      // 날짜와 시간을 합쳐서 ISOString으로 만듭니다.
+      date: new Date(
+        form.date.getFullYear(),
+        form.date.getMonth(),
+        form.date.getDate(),
+        form.time.getHours(),
+        form.time.getMinutes()
+      ).toISOString(),
+      name: type === 'lost' ? form.name : undefined,
+      gender: form.gender,
+      features: form.features,
+      locationDetails: form.location,
+      latitude: markerCoordinates.latitude, // 🚨 markerCoordinates 사용
+      longitude: markerCoordinates.longitude, // 🚨 markerCoordinates 사용
+      // 🚨 수정: 통합된 photoUris 사용
+      photos: photoUris, 
+    };
+
+    let resultPromise: Promise<Post>;
+
+    // 🚨 핵심 수정: 수정 모드와 생성 모드 분기
+    if (editMode && postId) {
+        // 🚨 수정 모드: updatePost 호출
+        resultPromise = updatePost(postId, postPayload); 
+    } else {
+        // 🚨 생성 모드: addPost 호출
+        // addPost는 Post 객체를 직접 반환하므로 Promise.resolve로 감싸 비동기 함수와 통일성을 확보합니다.
+        resultPromise = Promise.resolve(addPost(postPayload, currentUserId));
+    }
+    
+    // 비동기 처리
+    resultPromise
+      .then(resultPost => {
+        // 최종 결과 Post 객체를 부모에게 전달 (WritePostScreen의 onSubmit 호출)
+        onSubmit(resultPost);
+      })
+      .catch(error => {
+        console.error("게시글 저장/수정 중 오류 발생:", error);
+        Alert.alert("처리 실패", "게시글을 저장하거나 수정하는 데 문제가 발생했습니다.");
+      });
+  };
+
   const isFormValid =
     form.title &&
     form.species &&
@@ -453,7 +553,7 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
     form.gender &&
     form.location &&
     (type === 'lost' ? form.name : true) &&
-    (photos.length > 0 || aiImage) && 
+    (photos.length > 0 || aiImage) &&
     markerCoordinates; // 🚨 추가: 마커 좌표가 설정되었는지도 유효성 검사에 포함
 
   const formattedDate = form.date.toLocaleDateString('ko-KR', {
@@ -474,9 +574,17 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
       </Text>
 
       <View style={styles.imageUploadSection}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageSlotContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.imageSlotContainer}
+        >
           {!aiImage && (
-            <TouchableOpacity style={styles.addPhotoSlot} onPress={handleImagePicker}>
+            <TouchableOpacity
+              style={styles.addPhotoSlot}
+              onPress={handleImagePicker}
+            >
+              {/* 🚨 styles.addPhotoText를 사용합니다. */}
               <Text style={styles.addPhotoText}>
                 사진 추가{'\n'}({photos.length}/10)
               </Text>
@@ -485,7 +593,10 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
           {photos.map((uri, idx) => (
             <View key={idx} style={styles.imageSlot}>
               <Image source={{ uri }} style={styles.uploadedImage} />
-              <TouchableOpacity style={styles.removeImageButton} onPress={() => removePhoto(idx)}>
+              <TouchableOpacity
+                style={styles.removeImageButton}
+                onPress={() => removePhoto(idx)}
+              >
                 <Text style={styles.removeImageText}>x</Text>
               </TouchableOpacity>
             </View>
@@ -493,9 +604,14 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
         </ScrollView>
       </View>
 
-
       <View style={styles.formSection}>
-        <TextInput style={styles.input} placeholder="제목" placeholderTextColor="#666" value={form.title} onChangeText={(text) => handleInputChange('title', text)} />
+        <TextInput
+          style={styles.input}
+          placeholder="제목"
+          placeholderTextColor="#666"
+          value={form.title}
+          onChangeText={text => handleInputChange('title', text)}
+        />
       </View>
 
       <View style={styles.formSection}>
@@ -506,7 +622,7 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
             placeholder="반려견 이름"
             placeholderTextColor="#666"
             value={form.name}
-            onChangeText={(text) => handleInputChange('name', text)}
+            onChangeText={text => handleInputChange('name', text)}
           />
         )}
         <View style={styles.row}>
@@ -517,8 +633,10 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
               placeholderTextColor="#666"
               value={speciesQuery}
               onChangeText={handleSpeciesQueryChange}
-              onFocus={() => setShowSpeciesSuggestions(speciesSuggestions.length > 0)}
-/>
+              onFocus={() =>
+                setShowSpeciesSuggestions(speciesSuggestions.length > 0)
+              }
+            />
             {showSpeciesSuggestions && (
               <View style={styles.suggestionsContainer}>
                 {speciesSuggestions.map((suggestion, index) => (
@@ -545,8 +663,17 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
         <View style={styles.genderContainer}>
           <Text style={styles.genderLabel}>성별</Text>
           {['암컷', '수컷', '모름'].map(genderOption => (
-            <TouchableOpacity key={genderOption} style={styles.genderOption} onPress={() => handleInputChange('gender', genderOption)}>
-              <View style={[styles.radioIcon, form.gender === genderOption && styles.radioChecked]} />
+            <TouchableOpacity
+              key={genderOption}
+              style={styles.genderOption}
+              onPress={() => handleInputChange('gender', genderOption)}
+            >
+              <View
+                style={[
+                  styles.radioIcon,
+                  form.gender === genderOption && styles.radioChecked,
+                ]}
+              />
               <Text style={styles.genderOptionText}>{genderOption}</Text>
             </TouchableOpacity>
           ))}
@@ -558,10 +685,10 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
           multiline
           numberOfLines={4}
           value={form.features}
-          onChangeText={(text) => handleInputChange('features', text)}
+          onChangeText={text => handleInputChange('features', text)}
         />
       </View>
-      
+
       {photos.length === 0 && (
         <View style={styles.formSection}>
           <Text style={styles.sectionTitle}>AI 생성 이미지</Text>
@@ -571,8 +698,11 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
           {aiImage && (
             <View style={styles.aiImageContainer}>
               <Image source={{ uri: aiImage }} style={styles.aiGeneratedImage} />
-              <TouchableOpacity style={styles.removeAiImageButton} onPress={removeAiImage}>
-                <Text style={styles.removeAiImageText}>×</Text>
+              <TouchableOpacity
+                style={styles.removeAiImageButton}
+                onPress={removeAiImage}
+              >
+                <Text style={styles.removeImageText}>×</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -598,17 +728,26 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
           {type === 'lost' ? '실종 정보' : '목격 정보'}
         </Text>
         <View style={styles.row}>
-          <TouchableOpacity style={[styles.input, styles.halfInput]} onPress={() => setShowDatePicker(true)}>
+          <TouchableOpacity
+            style={[styles.input, styles.halfInput]}
+            onPress={() => setShowDatePicker(true)}
+          >
             <Text style={{ color: '#333' }}>{formattedDate}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.input, styles.halfInput, { marginLeft: 8 }]} onPress={() => setShowTimePicker(true)}>
+          <TouchableOpacity
+            style={[styles.input, styles.halfInput, { marginLeft: 8 }]}
+            onPress={() => setShowTimePicker(true)}
+          >
             <Text style={{ color: '#333' }}>{formattedTime}</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.input} onPress={() => {
-          setIsSearching(true);
-          setSearchQuery(form.location);
-        }}>
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => {
+            setIsSearching(true);
+            setSearchQuery(form.location);
+          }}
+        >
           <Text style={{ color: form.location ? '#333' : '#888' }}>
             {form.location || '장소 (위치 검색)'}
           </Text>
@@ -617,16 +756,17 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit, userMembe
           <MapViewComponent
             initialRegion={mapRegion}
             markerCoords={markerCoordinates}
+            // 🚨 핵심: 드래그 종료 핸들러 연결
+            onMarkerDragEnd={handleMarkerDragEnd} 
           />
         </View>
       </View>
-      
+
       {showDatePicker && renderDatePicker()}
       {showTimePicker && renderTimePicker()}
       {showSpeciesPicker && renderSpeciesPicker()}
       {showColorPicker && renderColorPicker()}
-      {isSearching && renderSearchResultsModal()} 
-
+      {isSearching && renderSearchResultsModal()}
 
       <TouchableOpacity
         style={[styles.submitButton, !isFormValid && styles.disabledButton]}
@@ -668,6 +808,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f7f7f7',
     marginRight: 8,
   },
+  // 🚨 스타일 정의가 이 안에 있어야 합니다. (스타일 오류 해결)
   addPhotoText: {
     fontSize: 12,
     color: '#888',

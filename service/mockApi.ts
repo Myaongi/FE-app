@@ -711,6 +711,49 @@ export const addPost = (post: PostPayload, userMemberName: string): Post => {
   mockPosts.unshift(newPost);
   return newPost;
 };
+// 🚨 1. 게시글 삭제 함수 추가 (Mock)
+export const deletePost = (postId: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        const initialLength = mockPosts.length;
+        
+        const newPosts = mockPosts.filter(post => post.id !== postId); 
+        
+        if (newPosts.length < initialLength) {
+            mockPosts.splice(0, mockPosts.length, ...newPosts); 
+            console.log(`[Mock API] 게시글 ID ${postId} 삭제 성공.`);
+            // 🚨 지연 시간 제거 후 즉시 완료
+            resolve(); 
+        } else {
+            console.log(`[Mock API] 게시글 ID ${postId}를 찾을 수 없어 삭제 실패`);
+            reject(new Error("Post not found.")); 
+        }
+    });
+};
+
+// 🚨 2. 게시글 수정 함수 추가 (Mock)
+export const updatePost = (postId: string, payload: PostPayload): Promise<Post> => {
+    return new Promise((resolve, reject) => {
+        const postIndex = mockPosts.findIndex(post => post.id === postId);
+        
+        if (postIndex !== -1) {
+            const updatedPost: Post = {
+                ...mockPosts[postIndex], // 기존 데이터 유지
+                ...payload, // payload로 받은 새 데이터 덮어쓰기
+                id: postId, // ID는 유지
+                uploadedAt: new Date().toISOString(), // 수정 시간 업데이트
+                // status는 수정 페이로드에 포함되지 않는다고 가정하고 기존 값 유지
+            };
+            
+            mockPosts[postIndex] = updatedPost;
+            console.log(`[Mock API] 게시글 ID ${postId} 수정 성공`);
+            setTimeout(() => resolve(updatedPost), 500);
+        } else {
+            console.log(`[Mock API] 게시글 ID ${postId}를 찾을 수 없어 수정 실패`);
+            setTimeout(() => reject(new Error("Post not found for update.")), 500);
+        }
+    });
+};
+
 // 종 목록 가져오기 (Mock)
 export const getSpeciesList = () => {
   return [

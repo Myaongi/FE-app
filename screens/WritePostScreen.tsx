@@ -23,13 +23,21 @@ const WritePostScreen = () => {
   const authContext = useContext(AuthContext);
   const userMemberName = authContext?.userMemberName || '알 수 없는 사용자';
 
+  // 🚨 수정된 부분: newPost에서 이미지 정보를 추출하여 PostDetail로 전달
   const handleFormSubmit = (newPost: Post) => {
     // 게시글 작성 후 PostDetailScreen으로 이동하고, 뒤로가기 시 LostScreen으로 가도록 스택 조정
     navigation.reset({
       index: 1,
       routes: [
         { name: 'RootTab', params: { screen: 'Lost' } },
-        { name: 'PostDetail', params: { id: newPost.id } }
+        { 
+          name: 'PostDetail', 
+          params: { 
+            id: newPost.id,
+            // 👈 핵심: WritePostForm에서 받은 photos (로컬 URI)를 localPhotos 파라미터로 전달
+            localPhotos: newPost.photos 
+          } 
+        }
       ],
     });
   };

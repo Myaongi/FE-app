@@ -1,6 +1,15 @@
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
-import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { 
+  Alert, 
+  SafeAreaView, 
+  ScrollView, 
+  StyleSheet, 
+  Text, 
+  TouchableOpacity, 
+  View, 
+  Image // 🚨 Image 컴포넌트 추가
+} from 'react-native';
 import BackIcon from '../assets/images/back.svg';
 import WarningIcon from '../assets/images/warning.svg';
 import { getUserName } from '../service/mockApi';
@@ -10,7 +19,7 @@ import MapViewComponent from './MapViewComponent';
 
 interface PostDetailContentProps {
   post: Post;
-  children: React.ReactNode;
+  children: React.ReactNode; 
   isGuest?: boolean;
 }
 
@@ -19,7 +28,8 @@ const PostDetailContent = ({ post, children, isGuest = false }: PostDetailConten
 
   const userName = getUserName(post.userMemberName);
   const relativePostTime = formatRelativeTime(post.uploadedAt);
-
+  
+  // 🚨 오류 해결: 지도 관련 변수 선언 위치 복구
   const initialMapRegion = {
     latitude: post.latitude,
     longitude: post.longitude,
@@ -33,6 +43,9 @@ const PostDetailContent = ({ post, children, isGuest = false }: PostDetailConten
     title: post.location,
     description: post.locationDetails,
   };
+  
+  // 🚨 이미지 소스: post.photos에서 첫 번째 이미지를 가져옵니다.
+  const imageUri = post.photos && post.photos.length > 0 ? post.photos[0] : null;
 
   const handleReportPress = () => {
     if (isGuest) {
@@ -59,6 +72,7 @@ const PostDetailContent = ({ post, children, isGuest = false }: PostDetailConten
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* 🚨 BackIcon과 사용자 정보 영역 */}
       <View style={styles.topNavBar}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.navIcon}>
           <BackIcon width={24} height={24} />
@@ -86,12 +100,19 @@ const PostDetailContent = ({ post, children, isGuest = false }: PostDetailConten
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.imagePlaceholder}>
-          <Text style={styles.imagePlaceholderText}>!! AI로 생성된 이미지입니다.</Text>
-        </View>
+        {/* 🚨 이미지 표시 영역 (기존 플레이스홀더 위치) */}
+        {imageUri ? (
+          <View style={styles.imageContainer}> 
+            <Image source={{ uri: imageUri }} style={styles.postImage} />
+          </View>
+        ) : (
+          <View style={styles.imagePlaceholder}>
+            <Text style={styles.imagePlaceholderText}>이미지 준비 중 또는 없음</Text>
+          </View>
+        )}
 
         <Text style={styles.postTitle}>{post.title}</Text>
-
+        
         <View style={styles.infoBox}>
           {post.type === 'lost' && (
             <View style={styles.infoRow}>
@@ -133,7 +154,8 @@ const PostDetailContent = ({ post, children, isGuest = false }: PostDetailConten
         </View>
       </ScrollView>
 
-      {children}
+      {/* 🚨 children (하단 버튼) 영역 */}
+      {children} 
 
     </SafeAreaView>
   );
@@ -192,6 +214,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 16,
   },
+  // 🚨 이미지 컨테이너 스타일 (이미지 렌더링 시 사용)
+  imageContainer: {
+    height: 200,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    overflow: 'hidden',
+  },
+  postImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  // 🚨 기존 플레이스홀더 스타일 (이미지가 없을 때 사용)
   imagePlaceholder: {
     height: 200,
     backgroundColor: '#f0f0f0',
@@ -244,7 +283,7 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 8,
   },
-  bottomButton: {
+  bottomButton: { 
     position: 'absolute',
     bottom: 20,
     left: 20,
@@ -259,7 +298,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
-  expiredPostContainer: {
+  expiredPostContainer: { 
     position: 'absolute',
     bottom: 20,
     left: 20,
