@@ -7,8 +7,9 @@ import { AuthContext } from '../App';
 import BackIcon from '../assets/images/back.svg';
 import ChatHeaderCard from '../components/ChatHeaderCard';
 import { getMapComponents } from '../components/MapComponents';
-import { getChatRoomById, getMessagesByRoomId, getPostById, getPostsByUserId, getUserName, sendMessage } from '../service/mockApi';
+import { getMessagesByRoomId, getMyPosts, getPostById, getChatRoomById, sendMessage } from '../service/mockApi';
 import { ChatRoom, Message, Post, RootStackParamList, StackNavigation } from '../types';
+import { mapStatusToKorean } from '../utils/format';
 
 type ChatDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ChatDetail'>;
 
@@ -22,7 +23,7 @@ const ChatDetailScreen = () => {
 
   const flatListRef = useRef<FlatList>(null);
   
-  const { postId, chatContext, chatRoomId } = route.params;
+  const { postId, chatContext, chatRoomId, type } = route.params;
   
   const [post, setPost] = useState<Post | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -41,7 +42,7 @@ const ChatDetailScreen = () => {
       }
 
       const fetchData = async () => {
-        const fetchedPost = getPostById(postId);
+        const fetchedPost = await getPostById(postId, type);
         setPost(fetchedPost || null);
         
         const fetchedChatRoom = await getChatRoomById(chatRoomId);
@@ -51,12 +52,14 @@ const ChatDetailScreen = () => {
         console.log('ChatDetailScreen에서 로드된 메시지들:', fetchedMessages);
         setMessages(fetchedMessages);
         
-        // 내가 작성한 게시글들 로드
-        const fetchedUserPosts = await getPostsByUserId(currentUserId);
-        setUserPosts(fetchedUserPosts);
+        // 내가 작성한 게시글들 로드 (getMyPosts 사용)
+        if (currentUserId) {
+          const { posts: fetchedUserPosts } = await getMyPosts('lost');
+          setUserPosts(fetchedUserPosts || []);
+        }
       };
       fetchData();
-    }, [postId, chatRoomId, isLoggedIn, currentUserId, navigation])
+    }, [postId, chatRoomId, type, isLoggedIn, currentUserId, navigation])
   );
 
   const refreshMessages = async () => {
@@ -144,12 +147,12 @@ const ChatDetailScreen = () => {
     console.log('렌더링할 메시지:', item);
 
     if (item.type === 'witness_report') {
-      console.log('목격 제보 메시지 렌더링:', item);
+      console.log('발견 제보 메시지 렌더링:', item);
       return (
         <View style={styles.witnessReportContainer}>
           <View style={styles.witnessReportCard}>
             <View style={styles.witnessReportHeader}>
-              <Text style={styles.witnessReportTitle}>📍 목격 제보</Text>
+              <Text style={styles.witnessReportTitle}>📍 발견 제보</Text>
               <Text style={styles.witnessReportTime}>{item.time}</Text>
             </View>
             {item.witnessData && (
@@ -202,7 +205,7 @@ const ChatDetailScreen = () => {
   }
 
   const otherParticipantId = chatRoom.participants.find(id => id !== currentUserId);
-  const otherUserName = getUserName(otherParticipantId || '');
+  const otherUserName = otherParticipantId || '상대방';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -219,11 +222,11 @@ const ChatDetailScreen = () => {
           color={post.color}
           location={post.location}
           date={post.date}
-          status={post.status}
+          status={mapStatusToKorean(post.status)}
           chatContext={chatContext}
           onPress={() => {
             console.log('게시글 상세 페이지로 이동:', post.id);
-            navigation.navigate('PostDetail', { id: post.id });
+            navigation.navigate('PostDetail', { id: post.id, type: post.type });
           }}
         />
         
@@ -365,7 +368,7 @@ const ChatDetailScreen = () => {
           
           <View style={styles.modalFooter}>
             <Text style={styles.modalDescription}>
-              지도를 터치하여 새로운 위치를 선택하세요.{'\n'}
+              지도를 터치하여 새로운 위치를 선택하세요.{"\n"} 
               빨간 핀: 기존 위치, 파란 핀: 새로운 위치
             </Text>
           </View>

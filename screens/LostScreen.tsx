@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, RefreshControl, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/native';
+import * as Location from 'expo-location';
+import LinearGradient from 'react-native-linear-gradient';
 import AppHeader from '../components/AppHeader';
 import TopTabs from '../components/TopTabs';
 import PostCard from '../components/PostCard';
@@ -10,222 +12,186 @@ import FilterModal from '../components/FilterModal';
 import { getPosts } from '../service/mockApi';
 import { Post, StackNavigation } from '../types';
 import { AuthContext } from '../App';
-import * as Location from 'expo-location'; 
-import { getUserLocation } from '../utils/location'; 
 
 const LostScreen = () => {
   const [activeTab, setActiveTab] = useState<'lost' | 'witnessed'>('witnessed');
   const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [isWriteModalVisible, setIsWriteModalVisible] = useState<boolean>(false);
-  const [isFilterModalVisible, setIsFilterModalVisible] = useState<boolean>(false);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [currentFilters, setCurrentFilters] = useState({
-    distance: 'all' as 'all' | number,
-    time: 'all' as 'all' | number,
-    sortBy: 'latest' as 'latest' | 'distance',
-  });
-  const [hasLocationPermission, setHasLocationPermission] = useState<boolean>(false); 
+  const [page, setPage] = useState(0);
+  const [hasNext, setHasNext] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isWriteModalVisible, setIsWriteModalVisible] = useState(false);
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+  const [hasLocationPermission, setHasLocationPermission] = useState(false);
+  const [filters, setFilters] = useState({ distance: 'all' as number | 'all', time: 'all' as number | 'all', sortBy: 'latest' as 'latest' | 'distance' });
 
   const navigation = useNavigation<StackNavigation>();
   const authContext = useContext(AuthContext);
+  const isFocused = useIsFocused();
 
-  const fetchPosts = async () => {
+  const loadPosts = async (isRefresh = false) => {
+    if (loading && !isRefresh) return;
+
+    const currentPage = isRefresh ? 0 : page;
+    if (!isRefresh && !hasNext) return;
+
     setLoading(true);
-    console.log("Fetching posts with filters:", currentFilters); 
-    const fetchedPosts = await getPosts(activeTab); 
-    setPosts(fetchedPosts);
-    setLoading(false);
+
+    try {
+      const apiType = activeTab === 'lost' ? 'lost' : 'found';
+      // TODO: Apply filters to getPosts call
+      const { posts: newPosts, hasNext: newHasNext } = await getPosts(apiType, currentPage);
+      if (isRefresh) {
+        setPosts(newPosts);
+      } else {
+        setPosts(prevPosts => [...prevPosts, ...newPosts]);
+      }
+      setHasNext(newHasNext);
+      setPage(currentPage + 1);
+    } catch (error) {
+      console.error('게시글을 불러오는 데 실패했습니다:', error);
+      Alert.alert('오류', '게시글을 불러오는 데 실패했습니다.');
+    } finally {
+      setLoading(false);
+      if (isRefresh) setRefreshing(false);
+    }
   };
 
   useEffect(() => {
-    fetchPosts();
-  }, [activeTab, currentFilters]);
+    if (isFocused) {
+      setPosts([]);
+      setPage(0);
+      setHasNext(true);
+      loadPosts(true);
+    }
+  }, [activeTab, filters, isFocused]);
 
-  useFocusEffect(
-    useCallback(() => {
-      setActiveTab('witnessed');
-      setIsFilterModalVisible(false);
-      
-      const requestAndSaveLocation = async () => {
-        if (authContext?.isLoggedIn) {
-          console.log("로그인 상태: 위치 권한 요청 시작");
-          
-          let { status } = await Location.getForegroundPermissionsAsync();
-          
-          if (status !== 'granted') {
-            console.log("기존 권한 없음. 권한 팝업 요청...");
-            const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
-            status = newStatus;
-          }
-  
-          if (status === 'granted') {
-            console.log("위치 정보 접근 권한이 허용되었습니다. DB에 위치 정보 저장.");
-            setHasLocationPermission(true);
-            await getUserLocation();
-          } else {
-            console.log("위치 정보 접근 권한이 거부되었습니다. 알림 기능을 사용할 수 없습니다.");
-            setHasLocationPermission(false);
-          }
-        }
-      };
-      
-      requestAndSaveLocation();
-      
-      return () => {};
-    }, [authContext?.isLoggedIn])
-  );
-
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh = () => {
     setRefreshing(true);
-    await fetchPosts();
-    setRefreshing(false);
-  }, [activeTab, currentFilters]);
+    loadPosts(true);
+  };
+
+  const handleLoadMore = () => {
+    if (!loading && hasNext) {
+      loadPosts();
+    }
+  };
 
   const handleFloatingButtonPress = () => {
     if (!authContext?.isLoggedIn) {
-      Alert.alert(
-        '로그인이 필요합니다',
-        '게시글을 작성하려면 로그인이 필요합니다.',
-        [
-          { text: '취소', style: 'cancel' },
-          { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
-        ]
-      );
+      Alert.alert('로그인 필요', '게시글을 작성하려면 로그인이 필요합니다.', [
+        { text: '취소', style: 'cancel' },
+        { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
+      ]);
     } else {
       setIsWriteModalVisible(true);
     }
   };
 
-  const handleWriteModalClose = () => {
-    setIsWriteModalVisible(false);
-  };
-
-  const handleSelectModalOption = (option: 'lost' | 'witnessed') => {
-    navigation.navigate('WritePostScreen', { type: option });
-    setIsWriteModalVisible(false);
-  };
-
-  const handleAlarmPress = () => {
-    if (!authContext?.isLoggedIn) {
-      Alert.alert(
-        '로그인이 필요합니다',
-        '알림을 확인하려면 로그인이 필요합니다.',
-        [
-          { text: '취소', style: 'cancel' },
-          { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
-        ]
-      );
+  const handleFilterPress = async () => {
+    if (authContext?.isLoggedIn) {
+      setHasLocationPermission(true);
     } else {
--     console.log('알림 화면으로 이동');
-+     navigation.navigate('NotificationsScreen');
-    }
-  };
-
-  const handleFilterPress = async () => { 
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    setHasLocationPermission(status === 'granted');
-    if (status === 'granted' && !authContext?.isLoggedIn) {
-      const location = await Location.getCurrentPositionAsync({});
-      console.log('게스트 위치 정보:', location.coords);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      setHasLocationPermission(status === 'granted');
     }
     setIsFilterModalVisible(true);
   };
 
-  const handleFilterModalClose = () => {
+  const handleApplyFilters = (newFilters: any) => {
+    setFilters(newFilters);
     setIsFilterModalVisible(false);
   };
 
-  const handleApplyFilters = useCallback((filters: { distance: number | 'all'; time: number | 'all'; sortBy: 'latest' | 'distance' }) => {
-    let safeTime = filters.time;
+  const renderFooter = () => {
+    if (!loading || refreshing) return null;
+    return <ActivityIndicator size="large" color="#888" style={{ marginVertical: 20 }} />;
+  };
 
-    if (typeof filters.time === 'number' && filters.time > 720) {
-      safeTime = 'all';
-    }
-
-    console.log('적용된 필터:', filters);
-
-    setCurrentFilters({ ...filters, time: safeTime });
-  }, []);
+  const renderEmpty = () => {
+    if (loading) return null;
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>표시할 게시글이 없습니다.</Text>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <LinearGradient
+        colors={['#FEFCE8', '#EFF6FF', '#F0F9FF']}
+        locations={[0, 0.5, 1]}
+        start={{x: 0, y: 0}}
+        end={{x: 1, y: 1}}
+        style={StyleSheet.absoluteFill}
+      />
       <View style={styles.container}>
         <AppHeader 
-          onAlarmPress={handleAlarmPress} 
+          onAlarmPress={() => {
+            if (!authContext?.isLoggedIn) {
+              Alert.alert('로그인 필요', '알림을 확인하려면 로그인이 필요합니다.', [
+                { text: '취소', style: 'cancel' },
+                { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
+              ]);
+            } else {
+              navigation.navigate('NotificationsScreen');
+            }
+          }} 
           onFilterPress={handleFilterPress}
         />
-        <TopTabs
-          onSelectTab={setActiveTab}
-          activeTab={activeTab}
-        />
-        <ScrollView
-          contentContainerStyle={styles.content}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-            />
-          }
-        >
-          {loading ? (
-            <Text style={styles.loadingText}>게시물을 불러오는 중...</Text>
-          ) : (
-            posts.map((post) => (
-              <TouchableOpacity
-                key={post.id}
-                onPress={() => navigation.navigate('PostDetail', { id: post.id })}
-              >
-                <PostCard
-                  type={post.type}
-                  title={post.title}
-                  species={post.species}
-                  color={post.color}
-                  location={post.location}
-                  date={post.date}
-                  status={post.status}
-                />
-              </TouchableOpacity>
-            ))
+        <TopTabs onSelectTab={setActiveTab} activeTab={activeTab} />
+        <FlatList
+          data={posts}
+          renderItem={({ item }) => (
+            <TouchableOpacity onPress={() => navigation.navigate('PostDetail', { id: item.id, type: item.type })}>
+              <PostCard
+                type={item.type}
+                title={item.title}
+                species={item.species}
+                color={item.color}
+                location={item.location}
+                date={item.date}
+                status={item.status}
+                photos={item.photos}
+              />
+            </TouchableOpacity>
           )}
-        </ScrollView>
+          keyExtractor={(item, index) => `${item.id}-${index}`}
+          contentContainerStyle={styles.content}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={renderEmpty}
+        />
       </View>
       <FloatingButton onPress={handleFloatingButtonPress} />
       <WritePostModal
         visible={isWriteModalVisible}
-        onClose={handleWriteModalClose}
-        onSelectOption={handleSelectModalOption}
+        onClose={() => setIsWriteModalVisible(false)}
+        onSelectOption={(option) => {
+          navigation.navigate('WritePostScreen', { type: option });
+          setIsWriteModalVisible(false);
+        }}
       />
-      
       <FilterModal
         visible={isFilterModalVisible}
-        onClose={handleFilterModalClose}
+        onClose={() => setIsFilterModalVisible(false)}
         onApplyFilters={handleApplyFilters}
-        initialFilters={currentFilters}
-        hasLocation={hasLocationPermission} 
+        initialFilters={filters}
+        hasLocation={hasLocationPermission}
       />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  container: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 0,
-    paddingTop: 10,
-  },
-  loadingText: {
-    textAlign: 'center',
-    marginTop: 50,
-    fontSize: 16,
-    color: '#888',
-  },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
+  container: { flex: 1 },
+  content: { paddingHorizontal: 0, paddingTop: 10 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
+  emptyText: { fontSize: 16, color: '#888' },
 });
 
 export default LostScreen;

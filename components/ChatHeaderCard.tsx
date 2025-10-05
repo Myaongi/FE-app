@@ -7,7 +7,7 @@ interface ChatHeaderCardProps {
   color: string;
   location: string;
   date: string;
-  status: '실종' | '목격' | '귀가 완료';
+  status: '실종' | '발견' | '귀가 완료';
   userPetName?: string;
   chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
   onPress?: () => void;
@@ -18,7 +18,7 @@ const getContextTitle = (context: string) => {
     case 'match':
       return '매칭 시스템을 통해 시작된 1:1채팅입니다';
     case 'lostPostReport':
-      return '목격 제보를 통해 시작된 1:1채팅입니다';
+      return '발견 제보를 통해 시작된 1:1채팅입니다';
     case 'witnessedPostReport':
       return '발견했어요 게시글을 통해 시작된 1:1채팅입니다';
     default:

@@ -9,11 +9,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { reportPost } from '../service/mockApi';
 
 interface ReportScreenProps {
   navigation: any;
   route: {
     params: {
+      postId: string;
+      postType: 'lost' | 'witnessed';
       postInfo: {
         userName: string;
         title: string;
@@ -25,32 +28,35 @@ interface ReportScreenProps {
 }
 
 const ReportScreen: React.FC<ReportScreenProps> = ({ navigation, route }) => {
-  const { postInfo } = route.params;
+  const { postId, postType, postInfo } = route.params;
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [reportDetails, setReportDetails] = useState<string>('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const reportReasons = [
-    { emoji: '★', text: '허위/장난 제보 같아요' },
-    { emoji: '■', text: '스팸·홍보/도배 글이에요' },
-    { emoji: '●', text: '불쾌한 표현이 있어요' },
-    { emoji: '•', text: '부적절한 사진/내용이에요' },
-    { emoji: '•', text: '개인정보가 노출됐어요' },
-    { emoji: '?', text: '분류가 잘못된 글 같아요' },
-    { emoji: '●', text: '다른 사람 사진/글을 무단으로 썼어요' },
+    { key: 'FAKE', emoji: '★', text: '허위/장난 제보 같아요' },
+    { key: 'SPAM', emoji: '■', text: '스팸·홍보/도배 글이에요' },
+    { key: 'OFFENSIVE', emoji: '●', text: '불쾌한 표현이 있어요' },
+    { key: 'INAPPROPRIATE', emoji: '•', text: '부적절한 사진/내용이에요' },
+    { key: 'COPYRIGHT', emoji: '●', text: '다른 사람 사진/글을 무단으로 썼어요' },
   ];
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedReason) {
       Alert.alert('알림', '신고 사유를 선택해주세요.');
       return;
     }
     
-    console.log('신고 제출:', { reason: selectedReason, details: reportDetails });
-    
-    setSelectedReason('');
-    setReportDetails('');
-    setShowSuccessModal(true);
+    try {
+      await reportPost(postId, postType, { 
+        reportType: selectedReason, 
+        reportContent: reportDetails 
+      });
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error('Report submission failed:', error);
+      Alert.alert('오류', '신고를 제출하는 중 오류가 발생했습니다.');
+    }
   };
 
   const handleClose = () => {
@@ -89,14 +95,14 @@ const ReportScreen: React.FC<ReportScreenProps> = ({ navigation, route }) => {
                 <TouchableOpacity
                   key={index}
                   style={styles.reasonItem}
-                  onPress={() => setSelectedReason(reason.text)}
+                  onPress={() => setSelectedReason(reason.key)}
                 >
                   <View style={styles.radioContainer}>
                     <View style={[
                       styles.radioButton,
-                      selectedReason === reason.text && styles.radioButtonSelected
+                      selectedReason === reason.key && styles.radioButtonSelected
                     ]}>
-                      {selectedReason === reason.text && (
+                      {selectedReason === reason.key && (
                         <View style={styles.radioInner} />
                       )}
                     </View>

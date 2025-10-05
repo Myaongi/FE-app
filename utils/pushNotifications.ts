@@ -28,19 +28,14 @@ export async function setupPushNotifications() {
         return;
       }
       
-      token = await Notifications.getExpoPushTokenAsync({
+      token = (await Notifications.getExpoPushTokenAsync({
         projectId: projectId,
-      });
-      console.log('발급된 푸시 토큰:', token.data);
+      })).data;
+      console.log('발급된 푸시 토큰:', token);
       
-      const userNickname = await AsyncStorage.getItem('userNickname');
-      
-      if (userNickname) {
-        await savePushToken(userNickname, token.data);
-        console.log('푸시 토큰이 서버에 성공적으로 저장되었습니다.');
-      } else {
-        console.log('로그인된 사용자 정보가 없어 푸시 토큰을 저장할 수 없습니다.');
-      }
+      await savePushToken(token);
+      console.log('푸시 토큰이 서버에 성공적으로 저장되었습니다.');
+
     } else {
       console.log('푸시 알림은 실제 기기에서만 테스트 가능합니다.');
     }

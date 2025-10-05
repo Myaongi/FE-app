@@ -11,7 +11,7 @@ const NotificationCard = ({ notification }: NotificationCardProps) => {
   const navigation = useNavigation<StackNavigation>();
 
   const handlePress = () => {
-    if (!notification.postId) return;
+    if (!notification.postId || !notification.postType) return;
 
     switch (notification.type) {
       case 'MATCH_FOUND':
@@ -22,7 +22,7 @@ const NotificationCard = ({ notification }: NotificationCardProps) => {
         break;
       case 'WITNESS_REPORT':
       case 'NEW_POST_NEARBY':
-        navigation.navigate('PostDetail', { id: notification.postId });
+        navigation.navigate('PostDetail', { id: notification.postId, type: notification.postType });
         break;
     }
   };

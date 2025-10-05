@@ -3,7 +3,7 @@ import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { Alert, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AuthContext } from '../App';
 import MatchCard from '../components/MatchCard';
-import { createChatRoom, getMatchesForPost, getPostById } from '../service/mockApi';
+import { getPostById, getMatchesForPost, createChatRoom } from '../service/mockApi';
 import { Match, Post, RootStackParamList } from '../types';
 
 const MatchScreen = () => {
@@ -22,12 +22,14 @@ const MatchScreen = () => {
 
   const fetchMatches = async () => {
     if (!isLoggedIn || !currentUserId) {
+      setMatches([]);
+      setUserPost(null);
       setLoading(false);
       return;
     }
     
     setLoading(true);
-    const fetchedUserPost = getPostById(postId);
+    const fetchedUserPost = await getPostById(postId, 'lost');
     if (fetchedUserPost) {
       setUserPost(fetchedUserPost);
       const fetchedMatches = await getMatchesForPost(postId);
@@ -50,29 +52,32 @@ const MatchScreen = () => {
     setMatches(prevMatches => prevMatches.filter(match => match.id !== id));
   }, []);
 
-  const handleViewDetails = useCallback((matchId: string) => {
-    navigation.navigate('PostDetail', { id: matchId });
+  const handleViewDetails = useCallback((match: Match) => {
+    navigation.navigate('PostDetail', { id: match.id, type: match.type });
   }, [navigation]);
 
-  const handleChatPress = async (matchedPostId: string) => {
+  const handleChatPress = async (match: Match) => {
     if (!isLoggedIn || !currentUserId) {
       Alert.alert('로그인 필요', '채팅을 이용하려면 로그인해야 합니다.');
       return;
     }
 
-    const matchedPost = getPostById(matchedPostId);
-    if (!matchedPost) return;
+    if (!match.userMemberName) {
+        Alert.alert('오류', '채팅 상대를 찾을 수 없습니다.');
+        return;
+    }
 
     const newRoom = await createChatRoom(
-      matchedPostId,
-      [currentUserId, matchedPost.userMemberName], 
+      match.id,
+      [currentUserId, match.userMemberName], 
       'match'
     );
     
     navigation.navigate('ChatDetail', { 
-      postId: matchedPostId,
+      postId: match.id,
       chatContext: 'match',
-      chatRoomId: newRoom.id, 
+      chatRoomId: newRoom.id,
+      type: match.type,
     });
   };
 
@@ -91,8 +96,10 @@ const MatchScreen = () => {
           />
         }
       >
-        {loading || !userPost ? (
+        {loading ? (
           <Text style={styles.loadingText}>매칭 정보를 불러오는 중...</Text>
+        ) : !userPost || matches.length === 0 ? (
+          <Text style={styles.loadingText}>매칭된 정보가 없습니다.</Text>
         ) : (
           matches.map((match) => (
             <MatchCard
@@ -104,9 +111,9 @@ const MatchScreen = () => {
               date={match.date}
               similarity={match.similarity}
               onDelete={() => handleDeleteMatch(match.id)}
-              onChat={() => handleChatPress(match.id)}
-              status={match.type === 'lost' ? '실종' : '목격'}
-              onPressInfo={() => handleViewDetails(match.id)}
+              onChat={() => handleChatPress(match)}
+              status={match.type === 'lost' ? '실종' : '발견'}
+              onPressInfo={() => handleViewDetails(match)}
               userPostType={userPost.type}
               userPetName={userPost.name}
             />

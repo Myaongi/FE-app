@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
 import FilterIcon from '../assets/images/filter.svg';
 import AlarmIcon from '../assets/images/alram.svg';
-import LogoIcon from '../assets/images/match.svg'; 
+import LogoIcon from '../assets/images/logo.svg'; 
 interface AppHeaderProps {
   showFilter?: boolean; // 기본값 true, 필요에 따라 변경 가능
 
@@ -42,9 +42,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
   },
   logoContainer: {
     flexDirection: 'row',

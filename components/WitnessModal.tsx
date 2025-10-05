@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, TextInput, TouchableOpacity, TouchableWithoutFeedback, FlatList, Platform } from 'react-native';
 import MapViewComponent from './MapViewComponent';
-import { geocodeAddress } from '../service/mockApi';
+import { geocodeAddress, getCoordinatesByPlaceId } from '../service/mockApi';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { GeocodeResult } from '../types';
 
@@ -81,15 +81,13 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
   const isFormValid = witnessDate !== '' && witnessTime !== '' && selectedLocation !== null;
 
   const handleSubmitPress = () => {
-    if (isFormValid) {
-        const submittedLocation = selectedLocation;
-        
+    if (isFormValid && selectedLocation) {
         onSubmit({
           date: witnessDate,
           time: witnessTime,
-          location: submittedLocation.address,
-          latitude: submittedLocation.latitude,
-          longitude: submittedLocation.longitude,
+          location: selectedLocation.address,
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
         });
 
         setWitnessDate('');
@@ -111,24 +109,24 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
         <View style={styles.centeredView}>
           <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalView}>
-              <Text style={styles.title}>목격했어요!</Text>
+              <Text style={styles.title}>발견했어요!</Text>
               
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>목격 날짜</Text>
+                <Text style={styles.inputLabel}>발견 날짜</Text>
                 <TouchableOpacity style={styles.dateInput} onPress={showDatePicker}>
                   <Text style={witnessDate ? styles.filledText : styles.placeholderText}>{witnessDate}</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>목격 시간</Text>
+                <Text style={styles.inputLabel}>발견 시간</Text>
                 <TouchableOpacity style={styles.dateInput} onPress={showTimePicker}>
                   <Text style={witnessTime ? styles.filledText : styles.placeholderText}>{witnessTime}</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>목격 장소</Text>
+                <Text style={styles.inputLabel}>발견 장소</Text>
                 <TextInput
                   style={styles.input}
                   placeholder=""
@@ -165,7 +163,7 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
               />
               
               <TouchableOpacity style={[styles.submitButton, !isFormValid && styles.disabledButton]} onPress={handleSubmitPress} disabled={!isFormValid}>
-                <Text style={styles.submitButtonText}>목격했어요</Text>
+                <Text style={styles.submitButtonText}>발견했어요</Text>
               </TouchableOpacity>
             </View>
           </TouchableWithoutFeedback>

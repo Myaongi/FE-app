@@ -4,8 +4,35 @@ import { Alert, SafeAreaView, ScrollView, StyleSheet, View } from 'react-native'
 import { AuthContext } from '../App';
 import AppHeader from '../components/AppHeader';
 import ChatItem from '../components/ChatItem';
-import { getChatRoomsByUserId, getPostById, getUserName, readChatRoom } from '../service/mockApi';
-import { RootStackParamList } from '../types';
+import { getChatRoomsByUserId, getPostById } from '../service/mockApi';
+import { RootStackParamList, Post } from '../types';
+
+// --- 임시 Mock 함수들 (API 연동 전까지 사용) ---
+const getUserName = (userId: string): string => {
+  console.log(`[MOCK] 사용자 이름 로드: ${userId}`);
+  return userId || '상대방'; // 임시로 ID 또는 기본값 반환
+};
+
+const readChatRoom = async (chatRoomId: string, userId: string): Promise<void> => {
+  console.log(`[MOCK] 채팅방 읽음 처리: ${chatRoomId}, 사용자: ${userId}`);
+  // 실제 동작 없이 성공한 것처럼 처리
+  return Promise.resolve();
+};
+// --- 임시 Mock 함수들 끝 ---
+
+// API status를 UI에 표시될 한글로 변환하는 함수
+const mapStatusToKorean = (status: 'MISSING' | 'SIGHTED' | 'RETURNED' | undefined | null): '실종' | '발견' | '귀가 완료' => {
+  switch (status) {
+    case 'MISSING':
+      return '실종';
+    case 'SIGHTED':
+      return '발견';
+    case 'RETURNED':
+      return '귀가 완료';
+    default:
+      return '실종'; // 기본값
+  }
+};
 
 interface TransformedChatData {
   id: string;
@@ -14,11 +41,12 @@ interface TransformedChatData {
   time: string;
   title: string;
   lastMessage: string;
-  status: '실종' | '목격' | '귀가 완료';
+  status: '실종' | '발견' | '귀가 완료'; // ChatItem이 기대하는 한글 타입으로 수정
   unreadCount: number;
   postId: string;
   chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
   lastMessageTime: string;
+  postType: 'lost' | 'witnessed';
 }
 
 const ChatScreen = () => {
@@ -39,37 +67,41 @@ const ChatScreen = () => {
     try {
       const rooms = await getChatRoomsByUserId(currentUserId);
       
-      const transformedChats = await Promise.all(
-        rooms.map(async (room) => {
-          const post = getPostById(room.postId);
-          
-          const otherParticipantId = room.participants.find(id => id !== currentUserId);
-          const name = getUserName(otherParticipantId || '');
-          
-          const location = post?.location || '위치 정보 없음';
-          const time = post?.date || '날짜 정보 없음';
-          const title = post?.title || '제목 없음';
-          
-          const unreadCount = room.unreadCounts[currentUserId] || 0;
-          const chatContext = room.chatContext;
+      const chatPromises = rooms.map(async (room) => {
+        const postType = room.chatContext === 'witnessedPostReport' ? 'witnessed' : 'lost';
+        const post = await getPostById(room.postId, postType);
+        if (!post) {
+          return null;
+        }
+        
+        const otherParticipantId = room.participants.find(id => id !== currentUserId);
+        const name = getUserName(otherParticipantId || '');
+        
+        const location = post?.location || '위치 정보 없음';
+        const time = post?.date || '날짜 정보 없음';
+        const title = post?.title || '제목 없음';
+        
+        const unreadCount = room.unreadCounts[currentUserId] || 0;
+        const chatContext = room.chatContext;
 
-          return {
-            id: room.id,
-            name,
-            location,
-            time,
-            title,
-            lastMessage: room.lastMessage,
-            status: post?.status || '실종',
-            unreadCount,
-            postId: room.postId,
-            chatContext: chatContext,
-            lastMessageTime: room.lastMessageTime, // 정렬을 위해 추가
-          };
-        })
-      );
+        return {
+          id: room.id,
+          name,
+          location,
+          time,
+          title,
+          lastMessage: room.lastMessage,
+          status: mapStatusToKorean(post?.status), // status를 한글로 변환
+          unreadCount,
+          postId: room.postId,
+          chatContext: chatContext,
+          lastMessageTime: room.lastMessageTime, // 정렬을 위해 추가
+          postType: post.type,
+        };
+      });
+
+      const transformedChats = (await Promise.all(chatPromises)).filter(Boolean) as TransformedChatData[];
       
-      // 최신 메시지 시간 순으로 정렬 (최신이 위로)
       const sortedChats = transformedChats.sort((a, b) => {
         return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
       });
@@ -97,10 +129,11 @@ const ChatScreen = () => {
       await readChatRoom(chatItem.id, currentUserId || '');
       await loadChats(); 
     }
-    navigation.navigate('ChatDetail', { 
+    navigation.navigate('ChatDetail', {
       postId: chatItem.postId,
       chatContext: chatItem.chatContext,
       chatRoomId: chatItem.id,
+      type: chatItem.postType, // type을 전달
     });
   };
 

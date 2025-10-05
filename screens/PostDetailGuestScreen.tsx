@@ -14,12 +14,12 @@ import PostDetailContent from '../components/PostDetailContent';
 import { getPostById } from '../service/mockApi';
 import { Post, AuthStackParamList, StackNavigation } from '../types';
 
-type PostDetailGuestRouteProp = RouteProp<AuthStackParamList, 'PostDetailGuest'>;
+type PostDetailGuestRouteProp = RouteProp<AuthStackParamList, 'PostDetail'>;
 
 const PostDetailGuestScreen = () => {
   const route = useRoute<PostDetailGuestRouteProp>();
   const navigation = useNavigation<StackNavigation>();
-  const { id } = route.params;
+  const { id, type } = route.params;
   const [post, setPost] = React.useState<Post | null>(null);
 
   React.useLayoutEffect(() => {
@@ -27,11 +27,11 @@ const PostDetailGuestScreen = () => {
   }, [navigation]);
 
   const fetchPost = React.useCallback(async () => {
-    const fetchedPost = getPostById(id);
+    const fetchedPost = await getPostById(id, type);
     if (fetchedPost) {
       setPost(fetchedPost);
     }
-  }, [id]);
+  }, [id, type]);
 
   React.useEffect(() => {
     fetchPost();
@@ -76,7 +76,7 @@ const PostDetailGuestScreen = () => {
       
       <PostDetailContent post={post} isGuest={true}>
         <SafeAreaView style={styles.bottomArea}>
-          {post.status === '귀가 완료' ? (
+          {post.status === 'RETURNED' ? (
             <View style={styles.expiredPostContainer}>
               <Text style={styles.expiredPostText}>이 게시물은 귀가 완료되었습니다.</Text>
             </View>
@@ -88,7 +88,7 @@ const PostDetailGuestScreen = () => {
               }}
             >
               <Text style={styles.bottomButtonText}>
-                {post.type === 'lost' ? '목격했어요' : '1:1 채팅하기'}
+                {post.type === 'lost' ? '발견했어요' : '1:1 채팅하기'}
               </Text>
             </TouchableOpacity>
           )}

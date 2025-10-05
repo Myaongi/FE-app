@@ -10,7 +10,7 @@ const TopTabs: React.FC<TopTabsProps> = ({ onSelectTab, activeTab }) => {
   return (
     <View style={styles.container}>
       <TouchableOpacity
-        style={[styles.tab, activeTab === 'witnessed' && styles.activeTab]} 
+        style={[styles.tab, activeTab === 'witnessed' && styles.activeWitnessed]} 
         onPress={() => onSelectTab('witnessed')} 
       >
         <Text style={[styles.tabText, activeTab === 'witnessed' && styles.activeTabText]}>
@@ -19,7 +19,7 @@ const TopTabs: React.FC<TopTabsProps> = ({ onSelectTab, activeTab }) => {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.tab, activeTab === 'lost' && styles.activeTab]}
+        style={[styles.tab, activeTab === 'lost' && styles.activeLost]}
         onPress={() => onSelectTab('lost')}
       >
         <Text style={[styles.tabText, activeTab === 'lost' && styles.activeTabText]}>
@@ -41,9 +41,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
   },
-  activeTab: {
+  activeWitnessed: {
     borderBottomWidth: 2,
-    borderBottomColor: '#333',
+    borderBottomColor: '#FFDB00',
+  },
+  activeLost: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#FFABBF',
   },
   tabText: {
     fontSize: 14,

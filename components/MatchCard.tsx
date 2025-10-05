@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import BackIcon from '../assets/images/back.svg'; 
+import { formatDisplayDate } from '../utils/time';
 
 interface MatchCardProps {
   title: string;
@@ -11,7 +12,7 @@ interface MatchCardProps {
   similarity: number;
   onDelete: () => void;
   onChat: () => void;
-  status: '실종' | '목격' | '귀가 완료'; 
+  status: '실종' | '발견' | '귀가 완료'; 
   onPressInfo: () => void;
   userPostType: 'lost' | 'witnessed';
   userPetName?: string;
@@ -42,7 +43,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
   const dynamicHeader = userPostType === 'lost'
     ? `실종된 ${userPetName || '반려동물'}와 비슷한 강아지를 발견했어요`
-    : '당신이 목격한 강아지, 혹시 이 아이일까요?';
+    : '당신이 발견한 강아지, 혹시 이 아이일까요?';
 
   return (
     <View style={styles.cardContainer}>
@@ -75,7 +76,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             <Text style={styles.infoValue}>{species}</Text>
           </View>
           <Text style={styles.infoText}>{location}</Text>
-          <Text style={styles.infoText}>{date}</Text>
+          <Text style={styles.infoText}>{formatDisplayDate(date)}</Text>
         </TouchableOpacity>
       </View>
       <View style={styles.bottomButtons}>

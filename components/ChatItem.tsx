@@ -9,7 +9,7 @@ export interface ChatData {
   time: string;
   title: string;
   lastMessage: string;
-  status: '실종' | '목격' | '귀가 완료';
+  status: '실종' | '발견' | '귀가 완료';
   unreadCount: number; 
 }
 
@@ -23,7 +23,7 @@ const ChatItem = ({ chat, onPress }: ChatItemProps) => {
     switch (status) {
       case '실종':
         return styles.lost;
-      case '목격':
+      case '발견':
         return styles.witnessed;
       case '귀가 완료':
         return styles.completed;

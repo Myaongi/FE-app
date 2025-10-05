@@ -1,50 +1,92 @@
-import { useNavigation, useRoute } from '@react-navigation/native';
-import React, { useContext, useLayoutEffect } from 'react';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import React, { useState, useLayoutEffect, useEffect } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { AuthContext } from '../App';
 import CancelIcon from '../assets/images/cancel.svg';
 import WritePostForm from '../components/WritePostForm';
-import { Post, StackNavigation } from '../types';
+import { addPost, updatePost, getPostById } from '../service/mockApi';
+import { Post, PostPayload, RootStackParamList, StackNavigation } from '../types';
+
+type WritePostScreenRouteProp = RouteProp<RootStackParamList, 'WritePostScreen'>;
 
 const WritePostScreen = () => {
   const navigation = useNavigation<StackNavigation>();
-  const route = useRoute();
-  const { type, editMode, postId } = route.params as { 
-    type: 'lost' | 'witnessed';
-    editMode?: boolean;
-    postId?: string;
-  };
-  const authContext = useContext(AuthContext);
-  const userMemberName = authContext?.userMemberName || '알 수 없는 사용자';
+  const route = useRoute<WritePostScreenRouteProp>();
+  
+  const { type, editMode, postId } = route.params;
 
-  // 🚨 수정된 부분: newPost에서 이미지 정보를 추출하여 PostDetail로 전달
-  const handleFormSubmit = (newPost: Post) => {
-    // 게시글 작성 후 PostDetailScreen으로 이동하고, 뒤로가기 시 LostScreen으로 가도록 스택 조정
-    navigation.reset({
-      index: 1,
-      routes: [
-        { name: 'RootTab', params: { screen: 'Lost' } },
-        { 
-          name: 'PostDetail', 
-          params: { 
-            id: newPost.id,
-            // 👈 핵심: WritePostForm에서 받은 photos (로컬 URI)를 localPhotos 파라미터로 전달
-            localPhotos: newPost.photos 
-          } 
+  const [post, setPost] = useState<Post | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const fetchPost = async () => {
+      if (editMode && postId) {
+        try {
+          const fetchedPost = await getPostById(postId, type);
+          if (fetchedPost) {
+            setPost(fetchedPost);
+          } else {
+            Alert.alert('오류', '게시글 정보를 불러올 수 없습니다.');
+            navigation.goBack();
+          }
+        } catch (error) {
+          Alert.alert('오류', '게시글 정보를 불러오는 중 에러가 발생했습니다.');
+          navigation.goBack();
         }
-      ],
-    });
+      }
+      setIsLoading(false);
+    };
+
+    fetchPost();
+  }, [editMode, postId, type, navigation]);
+
+  const handleSave = async (
+    postData: PostPayload,
+    newImageUris: string[],
+    existingImageUrls: string[],
+    deletedImageUrls: string[]
+  ) => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      if (editMode && postId) {
+        await updatePost(
+          postId,
+          postData,
+          newImageUris,
+          existingImageUrls,
+          deletedImageUrls
+        );
+        Alert.alert('성공', '게시글이 수정되었습니다.');
+        navigation.goBack();
+      } else {
+        // In create mode, only newImageUris will be populated.
+        const newPost = await addPost(postData, newImageUris);
+        Alert.alert('성공', '게시글이 등록되었습니다.');
+        navigation.replace('PostDetail', { id: newPost.postId.toString(), type: type });
+      }
+    } catch (error: any) {
+      Alert.alert('오류', error.message || '게시글 저장에 실패했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
   };
   
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
+
+  if (isLoading && editMode) {
+    return <ActivityIndicator style={styles.loader} size="large" />;
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -53,17 +95,20 @@ const WritePostScreen = () => {
           <CancelIcon width={24} height={24} />
         </TouchableOpacity>
         <Text style={styles.headerTitleText}>
-          {type === 'lost' ? '잃어버렸어요' : '발견했어요'}
+          {editMode ? '게시글 수정' : (type === 'lost' ? '실종 신고' : '발견 제보')}
         </Text>
         <View style={{ width: 40 }} />
       </View>
+      {isSaving ? (
+        <ActivityIndicator style={styles.loader} size="large" />
+      ) : (
         <WritePostForm 
-          type={type} 
-          onSubmit={handleFormSubmit} 
-          userMemberName={userMemberName}
-          editMode={editMode}
-          postId={postId}
+          postType={type} 
+          onSave={handleSave} 
+          isSaving={isSaving}
+          initialData={post}
         />
+      )}
     </SafeAreaView>
   );
 };
@@ -89,6 +134,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
+  },
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

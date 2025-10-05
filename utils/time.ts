@@ -42,3 +42,25 @@ export const formatRelativeTime = (isoString: string): string => {
     return `${diffInYears}년 전`;
   }
 };
+
+export const formatDisplayDate = (dateString: string): string => {
+  if (!dateString) return '';
+  // Expects a string like "2024-01-01" or an ISO string
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) {
+    return dateString; // Return original string if invalid
+  }
+
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  
+  // Check if time is available (not midnight UTC)
+  if (date.getUTCHours() !== 0 || date.getUTCMinutes() !== 0 || date.getUTCSeconds() !== 0) {
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      return `${year}.${month}.${day} ${hours}:${minutes}`;
+  }
+
+  return `${year}.${month}.${day}`;
+};

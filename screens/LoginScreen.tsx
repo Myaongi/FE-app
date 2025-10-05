@@ -11,7 +11,7 @@ import {
 import { AuthContext, navigationRef } from '../App'; 
 import LoginForm from '../components/LoginForm';
 import { login } from '../service/mockApi';
-import { ApiResponse, StackNavigation } from '../types';
+import { ApiResponse, AuthResult, StackNavigation } from '../types';
 import { setupPushNotifications } from '../utils/pushNotifications';
 
 const LoginScreen = () => {
@@ -40,7 +40,6 @@ const LoginScreen = () => {
   const handleLogin = async () => {
     console.log('🔐 [LOGIN SCREEN] 로그인 버튼 클릭됨');
     
-    // 1. 클라이언트 측 유효성 검사 (Alert 제거)
     if (!email || !password) {
       console.log('❌ [LOGIN SCREEN] 입력값 검증 실패: 이메일 또는 비밀번호 누락');
       return;
@@ -54,58 +53,36 @@ const LoginScreen = () => {
 
     try {
       console.log('🚀 [LOGIN SCREEN] login 함수 호출 시작');
-      const response: ApiResponse<any> = await login({ email, password });
+      const response: ApiResponse<AuthResult> = await login({ email, password });
       
       console.log('📨 [LOGIN SCREEN] login 함수 응답 받음:', response);
       
-      if (response.isSuccess) {
-        // ... (로그인 성공 로직)
+      if (response.isSuccess && response.result) {
         console.log('🎉 [LOGIN SCREEN] 로그인 성공, 사용자 정보 설정 중');
         
-        let memberName = null;
-        if (response.result && typeof response.result === 'object') {
-          memberName = response.result.memberName || response.result.nickname || response.result.username || response.result.name;
+        signIn(response.result); 
+
+        setTimeout(() => {
+            navigationRef.current?.reset({
+                index: 0,
+                routes: [{ name: 'RootTab' as any }], 
+            });
+            console.log('👤 [LOGIN SCREEN] 전역 Ref로 스택 초기화 완료');
+        }, 10); 
+
+        try {
+            console.log('🔔 [LOGIN SCREEN] 푸시 알림 설정 시작');
+            await setupPushNotifications();
+            console.log('🔔 [LOGIN SCREEN] 푸시 알림 설정 완료');
+        } catch (pushErr) {
+            console.log("🔔 [LOGIN SCREEN] 푸시 알림 설정을 건너뜁니다:", pushErr);
         }
-
-        if (memberName) {
-            console.log('로그인 성공 후 AuthContext에 전달할 memberName:', memberName);
             
-            await AsyncStorage.setItem('userMemberName', memberName);
-            
-            signIn(memberName); 
-
-            setTimeout(() => {
-                navigationRef.current?.reset({
-                    index: 0,
-                    routes: [{ name: 'RootTab' as any }], 
-                });
-                console.log('👤 [LOGIN SCREEN] 전역 Ref로 스택 초기화 완료');
-            }, 10); 
-
-            try {
-                console.log('🔔 [LOGIN SCREEN] 푸시 알림 설정 시작');
-                await setupPushNotifications();
-                console.log('🔔 [LOGIN SCREEN] 푸시 알림 설정 완료');
-            } catch (pushErr) {
-                console.log("🔔 [LOGIN SCREEN] 푸시 알림 설정을 건너뜁니다:", pushErr);
-            }
-            
-        } else {
-          console.log('❌ [LOGIN SCREEN] 사용자명을 찾을 수 없습니다. 응답 구조:', response.result);
-          // Alert.alert 제거
-          return;
-        }
-        
       } else {
-        // 2. 백엔드로부터 받은 에러 메시지 (Alert 제거)
         console.log('❌ [LOGIN SCREEN] 로그인 실패:', response.message);
-        // Alert.alert('로그인 실패', response.message || '알 수 없는 이유로 로그인에 실패했습니다. 다시 시도해주세요.'); // 제거됨
       }
     } catch (err: any) {
-      // 3. API 통신 자체에서 발생한 에러 (Alert 제거)
       console.log('🚨 [LOGIN SCREEN] 에러 발생:', err);
-      // const errorMessage = err.message || '로그인 중 네트워크 오류 또는 알 수 없는 오류가 발생했습니다. 다시 시도해주세요.';
-      // Alert.alert('오류 발생', errorMessage); // 제거됨
       console.error(err);
     }
   };
