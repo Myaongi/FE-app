@@ -113,6 +113,7 @@ const PostDetailScreen = () => {
         chatContext: 'lostPostReport',
         chatRoomId: chatRoom.id,
         type: post.type,
+        witnessData: witnessData, // witnessData를 파라미터로 전달
       });
     } catch (error) {
       Alert.alert('오류', '발견 제보 전송에 실패했습니다.');

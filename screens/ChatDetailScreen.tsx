@@ -1,14 +1,16 @@
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useContext, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { AuthContext } from '../App';
 import BackIcon from '../assets/images/back.svg';
 import ChatHeaderCard from '../components/ChatHeaderCard';
 import { getMapComponents } from '../components/MapComponents';
-import { getMessagesByRoomId, getMyPosts, getPostById, getChatRoomById, sendMessage } from '../service/mockApi';
+import { getMyPosts, getPostById, getChatRoomById } from '../service/mockApi';
+import { MockStompClient, MockMessage } from '../service/mockStompClient';
 import { ChatRoom, Message, Post, RootStackParamList, StackNavigation } from '../types';
+import { formatDisplayDate } from '../utils/time';
 import { mapStatusToKorean } from '../utils/format';
 
 type ChatDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ChatDetail'>;
@@ -18,12 +20,13 @@ const ChatDetailScreen = () => {
   const navigation = useNavigation<StackNavigation>();
   const authContext = useContext(AuthContext);
 
-  const { isLoggedIn, userMemberName } = authContext || { isLoggedIn: false, userMemberName: null };
+  const { isLoggedIn, userProfile, userMemberName } = authContext || {};
   const currentUserId = userMemberName;
 
   const flatListRef = useRef<FlatList>(null);
+  const clientRef = useRef<MockStompClient | null>(null);
   
-  const { postId, chatContext, chatRoomId, type } = route.params;
+  const { postId, chatContext, chatRoomId, type, witnessData } = route.params;
   
   const [post, setPost] = useState<Post | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -33,107 +36,108 @@ const ChatDetailScreen = () => {
   const [newLocation, setNewLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [userPosts, setUserPosts] = useState<Post[]>([]);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      if (!isLoggedIn || !currentUserId) {
-        Alert.alert('로그인 필요', '채팅을 이용하려면 로그인해야 합니다.');
-        navigation.goBack();
-        return;
-      }
-
-      const fetchData = async () => {
-        const fetchedPost = await getPostById(postId, type);
-        setPost(fetchedPost || null);
-        
-        const fetchedChatRoom = await getChatRoomById(chatRoomId);
-        setChatRoom(fetchedChatRoom || null);
-
-        const fetchedMessages = await getMessagesByRoomId(chatRoomId);
-        console.log('ChatDetailScreen에서 로드된 메시지들:', fetchedMessages);
-        setMessages(fetchedMessages);
-        
-        // 내가 작성한 게시글들 로드 (getMyPosts 사용)
-        if (currentUserId) {
-          const { posts: fetchedUserPosts } = await getMyPosts('lost');
-          setUserPosts(fetchedUserPosts || []);
-        }
-      };
-      fetchData();
-    }, [postId, chatRoomId, type, isLoggedIn, currentUserId, navigation])
-  );
-
-  const refreshMessages = async () => {
-    try {
-      const fetchedMessages = await getMessagesByRoomId(chatRoomId);
-      setMessages(fetchedMessages);
-    } catch (error) {
-      console.error('메시지 새로고침 실패:', error);
-    }
-  };
-
-  const handleSendMessage = async () => {
-    if (inputText.trim() === '' || !currentUserId) return;
-  
-    const currentMessageText = inputText;
-    setInputText('');
-
-    try {
-      await sendMessage(chatRoomId, { text: currentMessageText }, currentUserId);
-      await refreshMessages();
-    } catch (error) {
-      console.error("메시지 전송 실패:", error);
-    }
-  };
-
-  const handleImagePick = async () => {
-    if (!currentUserId) return;
-
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('권한 필요', '사진을 첨부하려면 갤러리 접근 권한이 필요합니다.');
+  useEffect(() => {
+    if (!isLoggedIn || !currentUserId) {
+      Alert.alert('로그인 필요', '채팅을 이용하려면 로그인해야 합니다.');
+      navigation.goBack();
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
+    // witnessData가 있으면 목격 카드를 첫 메시지로 추가
+    if (witnessData) {
+      const witnessMessage: Message = {
+        id: `witness_${Date.now()}`,
+        type: 'witness_report',
+        senderMemberName: currentUserId, // 제보자는 현재 사용자
+        time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+        witnessData: {
+          ...witnessData,
+          images: [], // TODO: 이미지 추가 필요
+        },
+      };
+      setMessages([witnessMessage]);
+    }
+
+    const fetchInitialData = async () => {
+      const fetchedPost = await getPostById(postId, type);
+      setPost(fetchedPost || null);
+      
+      const fetchedChatRoom = await getChatRoomById(chatRoomId);
+      setChatRoom(fetchedChatRoom || null);
+
+      if (currentUserId) {
+        const { posts: fetchedUserPosts } = await getMyPosts('lost');
+        setUserPosts(fetchedUserPosts || []);
+      }
+    };
+    fetchInitialData();
+  }, [postId, chatRoomId, type, isLoggedIn, currentUserId, navigation, witnessData]);
+
+  // --- 웹소켓 로직 ---
+  useEffect(() => {
+    if (!chatRoomId || !currentUserId) return;
+
+    const client = new MockStompClient();
+    clientRef.current = client;
+
+    client.onConnect = () => {
+      client.subscribe(`/sub/chatroom/${chatRoomId}`, (message) => {
+        const incomingMessage: MockMessage = JSON.parse(message.body);
+
+        const formattedMessage: Message = {
+          id: incomingMessage.messageId.toString(),
+          text: incomingMessage.content,
+          time: new Date(incomingMessage.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+          senderMemberName: incomingMessage.senderId === 1 ? (currentUserId || '나') : '상대방',
+          type: 'text',
+        };
+
+        setMessages(prevMessages => [...prevMessages, formattedMessage]);
+      });
+    };
+
+    client.activate();
+
+    return () => {
+      client.deactivate();
+    };
+  }, [chatRoomId, currentUserId]);
+
+
+  const handleSendMessage = async () => {
+    if (inputText.trim() === '' || !clientRef.current) return;
+  
+    const messageToSend = {
+      type: "MESSAGE",
+      chatroomId: chatRoomId,
+      content: inputText.trim(),
+    };
+
+    clientRef.current.publish({ 
+      destination: '/pub/chat', 
+      body: JSON.stringify(messageToSend) 
     });
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const imageUri = result.assets[0].uri;
-      try {
-        const newMessage = await sendMessage(chatRoomId, { imageUrl: imageUri }, currentUserId);
-        setMessages(prevMessages => [...prevMessages, newMessage]);
-      } catch (error) {
-        console.error("이미지 메시지 전송 실패:", error);
-      }
-    }
+    setInputText('');
+  };
+
+  const handleImagePick = async () => {
+    Alert.alert('알림', '이미지 전송은 현재 지원되지 않습니다.');
   };
 
   const handleLocationUpdate = async () => {
     if (!newLocation || !post) return;
 
     try {
-      // TODO: 실제 API 호출로 게시물 위치 업데이트
       console.log('위치 업데이트:', {
         postId: post.id,
         newLocation: newLocation,
-        oldLocation: { latitude: post.latitude, longitude: post.longitude }
       });
       
       Alert.alert(
         '위치 업데이트 완료',
         '게시물의 위치 정보가 업데이트되었습니다.',
-        [
-          {
-            text: '확인',
-            onPress: () => {
-              setShowLocationModal(false);
-              setNewLocation(null);
-            }
-          }
-        ]
+        [{ text: '확인', onPress: () => setShowLocationModal(false) }]
       );
     } catch (error) {
       console.error('위치 업데이트 실패:', error);
@@ -144,10 +148,8 @@ const ChatDetailScreen = () => {
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isMyMessage = item.senderMemberName === currentUserId;
-    console.log('렌더링할 메시지:', item);
 
     if (item.type === 'witness_report') {
-      console.log('발견 제보 메시지 렌더링:', item);
       return (
         <View style={styles.witnessReportContainer}>
           <View style={styles.witnessReportCard}>
@@ -163,11 +165,7 @@ const ChatDetailScreen = () => {
                 </View>
                 <View style={styles.witnessReportItem}>
                   <Text style={styles.witnessReportLabel}>시간:</Text>
-                  <Text style={styles.witnessReportValue}>{item.witnessData.time}</Text>
-                </View>
-                <View style={styles.witnessReportItem}>
-                  <Text style={styles.witnessReportLabel}>상세:</Text>
-                  <Text style={styles.witnessReportValue}>{item.witnessData.description}</Text>
+                  <Text style={styles.witnessReportValue}>{`${(item.witnessData as any).date} ${(item.witnessData as any).time}`}</Text>
                 </View>
                 {item.witnessData.images && item.witnessData.images.length > 0 && (
                   <View style={styles.witnessReportImages}>
@@ -207,6 +205,26 @@ const ChatDetailScreen = () => {
   const otherParticipantId = chatRoom.participants.find(id => id !== currentUserId);
   const otherUserName = otherParticipantId || '상대방';
 
+  const isAuthor = post.userMemberName === currentUserId;
+  let showChatHeaderCard = false;
+  let showLocationUploadButton = false;
+
+  if (chatContext === 'match') {
+    showChatHeaderCard = true;
+    const hasMyLostPost = userPosts?.some(p => p.type === 'lost');
+    if (hasMyLostPost) {
+      showLocationUploadButton = true;
+    }
+  } else if (chatContext === 'witnessedPostReport') {
+    if (!isAuthor) {
+      showChatHeaderCard = true;
+    }
+  } else if (chatContext === 'lostPostReport') {
+    if (isAuthor) {
+      showLocationUploadButton = true;
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.headerContainer}>
@@ -216,35 +234,25 @@ const ChatDetailScreen = () => {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{otherUserName}</Text>
         </View>
-        <ChatHeaderCard
-          title={post.title}
-          species={post.species}
-          color={post.color}
-          location={post.location}
-          date={post.date}
-          status={mapStatusToKorean(post.status)}
-          chatContext={chatContext}
-          onPress={() => {
-            console.log('게시글 상세 페이지로 이동:', post.id);
-            navigation.navigate('PostDetail', { id: post.id, type: post.type });
-          }}
-        />
+
+        {showChatHeaderCard && (
+          <ChatHeaderCard
+            title={post.title}
+            species={post.species}
+            color={post.color}
+            location={post.location}
+            date={formatDisplayDate(post.date)}
+            status={mapStatusToKorean(post.status)}
+            photos={post.photos}
+            chatContext={chatContext}
+            onPress={() => {
+              console.log('게시글 상세 페이지로 이동:', post.id);
+              navigation.navigate('PostDetail', { id: post.id, type: post.type });
+            }}
+          />
+        )}
         
-        {(() => {
-          const myLostPosts = userPosts?.filter(p => p.type === 'lost' && p.userMemberName === currentUserId) || [];
-          const hasMyLostPost = myLostPosts.length > 0;
-          
-          console.log('위치 업로드 조건 체크:', {
-            post: post ? { type: post.type, userMemberName: post.userMemberName } : null,
-            currentUserId,
-            chatContext,
-            myLostPosts: myLostPosts.length,
-            hasMyLostPost,
-            isMatchOrReport: chatContext === 'lostPostReport' || chatContext === 'match'
-          });
-          
-          return hasMyLostPost && (chatContext === 'lostPostReport' || chatContext === 'match');
-        })() && (
+        {showLocationUploadButton && (
           <View style={styles.locationUploadContainer}>
             <TouchableOpacity 
               style={styles.locationUploadButton}

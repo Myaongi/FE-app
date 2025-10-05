@@ -28,6 +28,7 @@ export type RootStackParamList = {
     chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
     chatRoomId: string;
     type: 'lost' | 'witnessed';
+    witnessData?: Message['witnessData']; // 발견 제보 데이터 추가
   };
   NotificationsScreen: undefined;
   Report: {

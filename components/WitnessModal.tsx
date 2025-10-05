@@ -52,30 +52,41 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
   const showDatePicker = () => showMode('date');
   const showTimePicker = () => showMode('time');
 
-  const handleLocationSearch = async (text: string) => { // 🚨 async 추가
+  const handleLocationSearch = async (text: string) => {
     setWitnessLocation(text);
     if (text.length > 1) {
       try {
-        // 🚨 수정: geocodeAddress 호출
-        const results = await geocodeAddress(text); 
+        const results = await geocodeAddress(text);
         setSearchResults(results);
+        if (results && results.length > 0) {
+          const firstResult = results[0];
+          const coords = await getCoordinatesByPlaceId(firstResult.id);
+          setSelectedLocation({
+            address: firstResult.address,
+            ...coords,
+          });
+        }
       } catch (error) {
         console.error('위치 검색 중 오류 발생:', error);
-        setSearchResults([]); // 오류 시 검색 결과 초기화
+        setSearchResults([]);
       }
     } else {
       setSearchResults([]);
     }
   };
 
-  const handleLocationSelect = (item: GeocodeResult) => {
-    setSelectedLocation({
-      address: item.address,
-      latitude: item.latitude,
-      longitude: item.longitude,
-    });
-    setWitnessLocation(item.address);
-    setSearchResults([]);
+  const handleLocationSelect = async (item: GeocodeResult) => {
+    try {
+      const coords = await getCoordinatesByPlaceId(item.id);
+      setSelectedLocation({
+        address: item.address,
+        ...coords,
+      });
+      setWitnessLocation(item.address);
+      setSearchResults([]);
+    } catch (error) {
+      console.error('좌표 변환 중 오류 발생:', error);
+    }
   };
 
   const isFormValid = witnessDate !== '' && witnessTime !== '' && selectedLocation !== null;
