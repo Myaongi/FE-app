@@ -52,13 +52,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginLeft: 8,
-    color: '#333',
+    color: '#000000',
   },
   iconsContainer: {
     flexDirection: 'row',
   },
   iconButton: {
-    marginLeft: 16,
+    marginLeft: 10,
     padding: 4,
   },
 });

@@ -25,16 +25,13 @@ const SignUpScreen = () => {
   const handleNext = () => {
     if (step === 1) {
       if (!isValidEmail(email)) {
-        // Alert.alert 제거
         return;
       }
     } else if (step === 2) {
       if (password.length < 6) {
-        // Alert.alert 제거
         return;
       }
       if (password !== confirmPassword) {
-        // Alert.alert 제거
         return;
       }
     }
@@ -54,7 +51,6 @@ const SignUpScreen = () => {
     
     if (memberName.length < 2 || memberName.length > 10) {
       console.log('❌ [SIGNUP SCREEN] 닉네임 길이 검증 실패:', memberName.length);
-      // Alert.alert 제거
       return;
     }
     
@@ -72,12 +68,10 @@ const SignUpScreen = () => {
         navigation.goBack();
       } else {
         console.log('❌ [SIGNUP SCREEN] 회원가입 실패:', response.message);
-        // Alert.alert 제거
       }
     } catch (err: any) {
       console.log('🚨 [SIGNUP SCREEN] 에러 발생:', err);
       console.log('🚨 [SIGNUP SCREEN] 에러 메시지:', err.message);
-      // Alert.alert 제거
     }
   };
 

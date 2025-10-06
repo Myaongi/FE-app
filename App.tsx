@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import {
   getNewMatchCount,
   getUserProfile, // 프로필 조회 함수 임포트
@@ -62,7 +63,6 @@ export const AuthContext = React.createContext<AuthContextType & { userMemberId:
 });
 export const navigationRef = React.createRef<NavigationContainerRef<any>>();
 
-// 🚨 수정 1: NotificationBehavior 타입 요구사항을 충족시키기 위해 shouldShowBanner와 shouldList를 추가
 Notifications.setNotificationHandler({
   handleNotification: async (notification: Notifications.Notification) => ({
     shouldShowAlert: true,
@@ -111,9 +111,18 @@ function RootTabNavigator() {
           paddingBottom: 10,
           backgroundColor: 'transparent',
           borderTopWidth: 1,
-          borderTopColor: '#f0f0f0',
+          borderTopColor: '#E9E9E9',
           elevation: 0,
-        } 
+        }, 
+        tabBarBackground: () => (
+          <LinearGradient
+            colors={[ '#EFF6FF', '#F0F9FF']}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ flex: 1 }}
+          />
+        ),
       }}
     >
       <Tab.Screen 
@@ -186,7 +195,6 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userMemberName, setUserMemberName] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  // 🚨 추가: userMemberId 상태 관리 (userProfile.memberId가 있지만 명시적으로 관리)
   const [userMemberId, setUserMemberId] = useState<number | null>(null); 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -221,7 +229,6 @@ export default function App() {
     }
   }, []);
 
-  // 🚨 4. `signOut` 함수 수정: AsyncStorage에서 `userMemberId` 제거
   const signOut = useCallback(async () => {
     setIsLoggedIn(false);
     setUserMemberName(null);
@@ -254,12 +261,11 @@ export default function App() {
   }, [signOut]);
 
   useEffect(() => {
-    // 🚨 3. `bootstrapAsync` 함수 수정: `userMemberId` 검색 및 `userProfile` 구성
+
     const bootstrapAsync = async () => {
       try {
         const token = await AsyncStorage.getItem('accessToken');
         const memberName = await AsyncStorage.getItem('userMemberName');
-        // 🚨 변경: AsyncStorage에서 userMemberId를 검색
         const memberIdString = await AsyncStorage.getItem('userMemberId'); 
         
         console.log('DEBUG: App.tsx - Retrieved token:', token);
@@ -272,7 +278,6 @@ export default function App() {
           setUserMemberName(memberName);
           setUserMemberId(memberId); // 검색된 memberId로 상태 설정
           
-          // 🚨 변경: 검색된 userMemberId를 사용하여 userProfile 객체를 구성
           setUserProfile({
             memberId: memberId,
             username: memberName,
@@ -296,9 +301,8 @@ export default function App() {
     isLoggedIn,
     userMemberName,
     userProfile,
-    // 🚨 변경: userProfile?.memberId 대신 userMemberId 상태를 사용
+
     userMemberId: userMemberId, 
-    // 🚨 2. `signIn` 함수 수정: `authResult.userId`를 예상하고 처리
     signIn: async (authResult: AuthResult) => {
       // AuthResult 타입에 userId가 포함되어 있다고 가정하고 사용합니다.
       const { userId, memberName, accessToken, refreshToken } = authResult; 
@@ -310,12 +314,10 @@ export default function App() {
       try {
         await AsyncStorage.setItem('userMemberName', memberName);
         await AsyncStorage.setItem('accessToken', accessToken); // accessToken 저장
-        // 🚨 변경: authResult.userId를 userMemberId로 저장
         await AsyncStorage.setItem('userMemberId', userId.toString()); 
         // refreshToken 저장 (AuthResult에 포함되었다고 가정)
         await AsyncStorage.setItem('refreshToken', refreshToken);
 
-        // 🚨 변경: authResult.userId를 사용하여 userProfile 객체를 구성
         setUserProfile({
           memberId: userId,
           username: memberName,
@@ -362,7 +364,6 @@ export default function App() {
     });
 
     notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      // 🚨 수정 2: 타입 단언 방식을 as unknown as PushNotificationData로 변경하여 오류 해결
       const data = response.notification.request.content.data as unknown as PushNotificationData;
       handleNotification(data);
     });

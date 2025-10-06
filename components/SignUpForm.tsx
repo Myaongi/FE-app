@@ -12,7 +12,6 @@ interface SignUpFormProps {
   setConfirmPassword: (text: string) => void;
   memberName: string;
   setMemberName: (text: string) => void;
-  // 🚨 제거: error Prop 삭제
   onNext: () => void;
   onBack: () => void;
   onClose: () => void;
@@ -29,7 +28,6 @@ const SignUpForm = ({
   setConfirmPassword,
   memberName,
   setMemberName,
-  // 🚨 제거: error Prop 삭제
   onNext,
   onBack,
   onClose,
@@ -52,7 +50,6 @@ const SignUpForm = ({
     }
   };
 
-  // 🚨 제거: getErrorMessage 함수 삭제
 
   const renderStepContent = () => {
     switch (step) {
@@ -60,7 +57,6 @@ const SignUpForm = ({
         return (
           <>
             <Text style={styles.promptText}>이메일로 시작하기</Text>
-            {/* 🚨 수정: 에러 스타일 조건 제거 */}
             <View style={styles.inputContainer}>
               <Image 
                 source={(emailFocused || email.trim()) ? require('../assets/images/emon.png') : require('../assets/images/em.png')} 
@@ -78,14 +74,12 @@ const SignUpForm = ({
                 onBlur={() => setEmailFocused(false)}
               />
             </View>
-            {/* 🚨 제거: 이메일 에러 메시지 렌더링 삭제 */}
           </>
         );
       case 2:
         return (
           <>
             <Text style={styles.promptText}>비밀번호 설정</Text>
-            {/* 🚨 수정: 에러 스타일 조건 제거 */}
             <View style={styles.inputContainer}>
               <Image 
                 source={(passwordFocused || password.trim()) ? require('../assets/images/pwon.png') : require('../assets/images/pw.png')} 
@@ -102,8 +96,6 @@ const SignUpForm = ({
                 onBlur={() => setPasswordFocused(false)}
               />
             </View>
-            {/* 🚨 제거: 비밀번호 에러 메시지 렌더링 삭제 */}
-            {/* 🚨 수정: 에러 스타일 조건 제거 */}
             <View style={styles.inputContainer}>
               <Image 
                 source={(confirmPasswordFocused || confirmPassword.trim()) ? require('../assets/images/pwon.png') : require('../assets/images/pw.png')} 
@@ -120,22 +112,19 @@ const SignUpForm = ({
                 onBlur={() => setConfirmPasswordFocused(false)}
               />
             </View>
-            {/* 🚨 제거: 비밀번호 확인 에러 메시지 렌더링 삭제 */}
           </>
         );
       case 3:
         return (
           <>
             <Text style={styles.promptText}>닉네임 설정</Text>
-            {/* 🚨 수정: 에러 스타일 조건 제거 */}
             <TextInput
-              style={styles.inputOnly /* && styles.inputError*/ }
+              style={styles.inputOnly}
               placeholder="닉네임"
               placeholderTextColor="#B0B0B0"
               value={memberName}
               onChangeText={setMemberName}
             />
-            {/* 🚨 제거: 닉네임 에러 메시지 렌더링 삭제 */}
           </>
         );
       default:

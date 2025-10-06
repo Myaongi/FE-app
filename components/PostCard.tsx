@@ -16,10 +16,9 @@ interface PostCardProps {
   date: string;
   status: Post['status'];
   photos?: string[];
-  timeAgo?: string; // Kept for future use if API changes
+  timeAgo?: string; 
 }
 
-//제목 글자 수 제한
 const truncateText = (text: string, maxLength: number) => {
   if (text.length > maxLength) {
     return text.substring(0, maxLength) + '...';
@@ -95,7 +94,7 @@ const PostCard: React.FC<PostCardProps> = ({
 const styles = StyleSheet.create({
   cardContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.50)',
     borderRadius: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -143,8 +142,8 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   image: {
-    width: 80,
-    height: 80,
+    width: 90,
+    height: 90,
     backgroundColor: '#e0e0e0',
     borderRadius: 10,
   },

@@ -142,7 +142,6 @@ const ReportScreen: React.FC<ReportScreenProps> = ({ navigation, route }) => {
           ]}>신고하기</Text>
         </TouchableOpacity>
 
-      {/* 신고 완료 모달 */}
       <Modal
         visible={showSuccessModal}
         transparent={true}

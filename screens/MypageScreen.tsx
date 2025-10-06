@@ -1,5 +1,5 @@
 import { useIsFocused, useNavigation } from '@react-navigation/native';
-import React, { useCallback, useContext, useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import {
   Alert,
   FlatList,
@@ -11,12 +11,16 @@ import {
   View,
   ActivityIndicator
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { AuthContext } from '../App';
-import AppHeader from '../components/AppHeader';
+import AppHeader from '../components/AppHeader'; 
 import PostCard from '../components/PostCard';
 import TopTabs from '../components/TopTabs';
 import { getMyPosts } from '../service/mockApi';
 import { Post, StackNavigation } from '../types';
+import Logo from '../assets/images/logo.svg'; 
+import AlarmIcon from '../assets/images/alram.svg';
+
 
 const MypageScreen = () => {
   const navigation = useNavigation<StackNavigation>();
@@ -40,7 +44,6 @@ const MypageScreen = () => {
     setLoading(true);
 
     try {
-      // 'witnessed' 탭은 API에서 'found'로 요청해야 함
       const typeForApi = activeTab === 'witnessed' ? 'found' : 'lost';
       const { posts: newPosts, hasNext: newHasNext } = await getMyPosts(typeForApi, currentPage);
       
@@ -88,72 +91,181 @@ const MypageScreen = () => {
     ]);
   };
 
-  const renderHeader = () => (
-    <View style={{ marginBottom: 20 }}>
-      <View style={styles.userInfoSection}>
-        <Text style={styles.userName}>{userProfile?.username || '사용자'}</Text>
-      </View>
-      <View style={styles.myActivitiesContainer}>
-        <Text style={styles.myActivitiesText}>내 활동</Text>
-        <TouchableOpacity onPress={handleLogout}>
-          <Text style={styles.logoutText}>로그아웃</Text>
-        </TouchableOpacity>
-      </View>
-      <TopTabs onSelectTab={setActiveTab} activeTab={activeTab} />
-    </View>
-  );
-
   if (!isLoggedIn) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <AppHeader showFilter={false} onAlarmPress={() => navigation.navigate('LoginScreen')} />
-        <View style={styles.loggedOutContainer}>
-          <Text style={styles.loggedOutText}>로그인 후 마이페이지를 이용해주세요.</Text>
-          <TouchableOpacity style={styles.loginButton} onPress={() => navigation.navigate('LoginScreen')}>
-            <Text style={styles.loginButtonText}>로그인/회원가입</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <LinearGradient 
+        colors={['#FEFCE8', '#EFF6FF', '#F0F9FF']} 
+        locations={[0, 0.5, 1]} 
+        style={styles.fullScreenGradient}
+      >
+        <SafeAreaView style={styles.safeArea}>
+          <AppHeader showFilter={false} onAlarmPress={() => navigation.navigate('LoginScreen')} />
+          <View style={styles.loggedOutContainer}>
+            <Text style={styles.loggedOutText}>로그인 후 마이페이지를 이용해주세요.</Text>
+            <TouchableOpacity style={styles.loginButton} onPress={() => navigation.navigate('LoginScreen')}>
+              <Text style={styles.loginButtonText}>로그인/회원가입</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <AppHeader showFilter={false} onAlarmPress={() => navigation.navigate('NotificationsScreen')} />
-      <FlatList
-        data={posts}
-        ListHeaderComponent={renderHeader}
-        renderItem={({ item }) => (
-          <TouchableOpacity onPress={() => navigation.navigate('PostDetail', { id: item.id, type: item.type })}>
-            <PostCard {...item} />
-          </TouchableOpacity>
-        )}
-        keyExtractor={(item, index) => `${item.id}-${index}`}
-        contentContainerStyle={styles.postListContainer}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-        ListFooterComponent={loading && !refreshing ? <ActivityIndicator style={{ marginVertical: 20 }} /> : null}
-        ListEmptyComponent={() => (
-          !loading && (
-            <View style={styles.noPostsContainer}>
-              <Text style={styles.noPostsText}>작성한 게시글이 없습니다.</Text>
+    <LinearGradient 
+      colors={['#FEFCE8', '#EFF6FF', '#F0F9FF']} 
+      locations={[0, 0.5, 1]} 
+      style={styles.fullScreenGradient}
+    >
+      <SafeAreaView style={styles.safeArea}>
+
+        <LinearGradient
+          colors={['#8ED7FF', '#CDECFF']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.blueHeaderBackground}
+        />
+        
+
+        <View style={styles.customHeader}>
+            <View style={{ width: 24 }} />
+            <Text style={styles.headerTitle}>마이페이지</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('NotificationsScreen')}>
+              {/* import 한 AlarmIcon 컴포넌트를 직접 사용 */}
+              <AlarmIcon width={24} height={24} /> 
+            </TouchableOpacity>
+        </View>
+
+        <View style={styles.listHeaderContainer}>
+          <View style={styles.welcomeCardWrapper}>
+            <View style={styles.welcomeCard}>
+              <Logo width={24} height={24} />
+              <Text style={styles.welcomeText}>
+                <Text style={styles.userName}>{userProfile?.username || '사용자'}</Text>님 안녕하세요!
+              </Text>
             </View>
-          )
-        )}
-      />
-    </SafeAreaView>
+          </View>
+
+          <View style={styles.logoutContainer}>
+            <TouchableOpacity onPress={handleLogout}>
+              <Text style={styles.logoutText}>로그아웃</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TopTabs onSelectTab={setActiveTab} activeTab={activeTab} />
+        </View>
+
+
+        <FlatList
+          data={posts}
+          renderItem={({ item }) => (
+            <TouchableOpacity onPress={() => navigation.navigate('PostDetail', { id: item.id, type: item.type })}>
+              <PostCard {...item} />
+            </TouchableOpacity>
+          )}
+          keyExtractor={(item, index) => `'''${item.id}-'''${index}`}
+          contentContainerStyle={styles.postListContainer}
+          ItemSeparatorComponent={() => <View style={{ height: 1 }} />}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          ListFooterComponent={loading && !refreshing ? <ActivityIndicator style={{ marginVertical: 20 }} /> : null}
+          ListEmptyComponent={() => (
+            !loading && (
+              <View style={styles.noPostsContainer}>
+                <Text style={styles.noPostsText}>작성한 게시글이 없습니다.</Text>
+              </View>
+            )
+          )}
+        />
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fff' },
-  userInfoSection: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  userName: { fontSize: 22, fontWeight: 'bold' },
-  myActivitiesContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
-  myActivitiesText: { fontSize: 18, fontWeight: 'bold' },
-  logoutText: { fontSize: 14, color: '#FF6347' },
-  postListContainer: { paddingBottom: 20 },
+  fullScreenGradient: {
+    flex: 1,
+  },
+  safeArea: { 
+    flex: 1, 
+    backgroundColor: 'transparent',
+  },
+
+  blueHeaderBackground: {
+    width: '100%',
+    height: 190,
+    position: 'absolute',
+    top: 0,
+    zIndex: -1, 
+  },
+
+  customHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 10, 
+    height: 60,
+    backgroundColor: 'transparent',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#424242',
+  },
+
+  listHeaderContainer: {
+    marginTop: 20, 
+  },
+  welcomeCardWrapper: {
+    paddingHorizontal: 20,
+  },
+
+  welcomeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFFEF5',
+    paddingVertical: 36,
+    paddingHorizontal: 20,
+    borderRadius: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#D6D6D6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    marginBottom: 10, 
+  },
+  welcomeText: {
+    fontSize: 18,
+    color: '#424242',
+    fontWeight: 'normal',
+  },
+  userName: {
+    fontWeight: 'bold',
+  },
+  logoutContainer: {
+    alignItems: 'flex-end',
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  logoutText: {
+    color: '#888',
+    fontSize: 14,
+  },
+
+
+  postListContainer: { 
+    paddingTop:13,
+    paddingBottom:20, 
+  },
+  
+  userInfoSection: { display: 'none' },
+  myActivitiesContainer: { display: 'none' },
+  
   noPostsContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 50 },
   noPostsText: { fontSize: 16, color: '#888' },
   loggedOutContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },

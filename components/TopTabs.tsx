@@ -33,30 +33,32 @@ const TopTabs: React.FC<TopTabsProps> = ({ onSelectTab, activeTab }) => {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   tab: {
     flex: 1,
     paddingVertical: 12,
     alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: '#D6D6D6',
   },
   activeWitnessed: {
-    borderBottomWidth: 2,
     borderBottomColor: '#FFDB00',
   },
   activeLost: {
-    borderBottomWidth: 2,
     borderBottomColor: '#FFABBF',
   },
   tabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#888',
+    color: '#D6D6D6',
+    textAlign: 'center',
+    fontFamily: 'Apple SD Gothic Neo',
+    fontSize: 16,
+    fontStyle: 'normal',
+    fontWeight: '600',
+    lineHeight: 21,
   },
   activeTabText: {
-    color: '#333',
-    fontWeight: 'bold',
+    color: '#000',
+    fontWeight: '700',
   },
 });
 

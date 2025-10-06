@@ -127,19 +127,21 @@ const LostScreen = () => {
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.container}>
-        <AppHeader 
-          onAlarmPress={() => {
-            if (!authContext?.isLoggedIn) {
-              Alert.alert('로그인 필요', '알림을 확인하려면 로그인이 필요합니다.', [
-                { text: '취소', style: 'cancel' },
-                { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
-              ]);
-            } else {
-              navigation.navigate('NotificationsScreen');
-            }
-          }} 
-          onFilterPress={handleFilterPress}
-        />
+        <View style={styles.headerContainer}>
+          <AppHeader 
+            onAlarmPress={() => {
+              if (!authContext?.isLoggedIn) {
+                Alert.alert('로그인 필요', '알림을 확인하려면 로그인이 필요합니다.', [
+                  { text: '취소', style: 'cancel' },
+                  { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
+                ]);
+              } else {
+                navigation.navigate('NotificationsScreen');
+              }
+            }} 
+            onFilterPress={handleFilterPress}
+          />
+        </View>
         <TopTabs onSelectTab={setActiveTab} activeTab={activeTab} />
         <FlatList
           data={posts}
@@ -189,6 +191,10 @@ const LostScreen = () => {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1 },
+  headerContainer: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#D9D9D9',
+  },
   content: { paddingHorizontal: 0, paddingTop: 10 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
   emptyText: { fontSize: 16, color: '#888' },

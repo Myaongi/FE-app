@@ -77,7 +77,7 @@ const PostDetailScreen = () => {
       return;
     }
     
-    if (post.authorId === userMemberId) { // userMemberId 직접 사용
+    if (post.authorId === userMemberId) { 
       Alert.alert("알림", "자신과는 채팅할 수 없습니다.");
       return;
     }
@@ -91,7 +91,7 @@ const PostDetailScreen = () => {
         chatRoomId: newRoom.chatroomId.toString(),
         partnerId: post.authorId,
         partnerNickname: post.userMemberName,
-        lastMessage: '', // 새 채팅방이므로 마지막 메시지는 비어있음
+        lastMessage: '', 
         lastMessageTime: new Date().toISOString(),
         unreadCount: 0,
         postId: post.id,
@@ -187,15 +187,12 @@ const PostDetailScreen = () => {
     <View style={styles.container}>
       <SafeAreaView style={styles.headerSafeArea}>
         <View style={styles.headerContainer}>
-          {/* 1. 왼쪽 공간 (뒤로가기 버튼 등)을 위한 자리. 현재는 빈 View로 대체 */}
           <View style={styles.sidePlaceholder} /> 
           
-          {/* 2. 중앙 타이틀 */}
           <Text style={styles.postTypeText}>
             {post.type === 'lost' ? '잃어버렸어요' : '발견했어요'}
           </Text>
           
-          {/* 3. 오른쪽 버튼들: 작성자 본인일 때만 표시됨 */}
           {isMyPost ? (
             <View style={styles.actionButtons}>
               <TouchableOpacity onPress={() => navigation.navigate('WritePostScreen', { type: post.type, editMode: true, postId: post.id })}>
@@ -206,7 +203,6 @@ const PostDetailScreen = () => {
               </TouchableOpacity>
             </View>
           ) : (
-            // 작성자가 아닐 때도 레이아웃 균형을 위해 빈 공간을 유지합니다.
             <View style={styles.sidePlaceholder} />
           )}
         </View>
@@ -254,7 +250,6 @@ const styles = StyleSheet.create({
   headerSafeArea: { backgroundColor: '#fff' },
   headerContainer: {
     flexDirection: 'row',
-    // 기존: 'flex-end' -> 변경: 'space-between'으로 왼쪽/중앙/오른쪽 영역을 확보
     justifyContent: 'space-between', 
     alignItems: 'center',
     paddingHorizontal: 20,
@@ -263,28 +258,24 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
   },
-  // 중앙 텍스트가 양쪽 버튼 영역만큼 공간을 확보하면서 중앙에 위치하도록 수정
   postTypeText: { 
     fontSize: 18, 
     fontWeight: 'bold', 
     color: '#333', 
-    flex: 1, // 남은 공간을 채우면서
-    textAlign: 'center', // 텍스트는 중앙 정렬
+    flex: 1, 
+    textAlign: 'center', 
   },
-  // 버튼 그룹에 필요한 최소 공간을 확보
+  
   actionButtons: { 
     flexDirection: 'row', 
     gap: 15, 
-    // 버튼 텍스트 길이에 맞춰 최소 너비 설정 (약 60px)
     minWidth: 60, 
     justifyContent: 'flex-end',
-    // zIndex: 1, // 레이아웃 수정으로 zIndex 불필요하지만 유지해도 무방
   },
-  // 왼쪽/오른쪽 균형을 맞추기 위한 빈 공간용 스타일 추가
   sidePlaceholder: { 
-    minWidth: 60, // actionButtons와 동일한 너비로 설정
+    minWidth: 60, 
   },
-  // **기존 headerCenteredText 스타일은 제거했습니다.**
+
 
   actionButtonText: { color: '#007AFF', fontSize: 14, fontWeight: '500' },
   deleteButtonText: { color: '#FF3B30' },

@@ -1,5 +1,3 @@
-// PostDetailGuestScreen.tsx
-
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import React from 'react';
 import { 
@@ -60,17 +58,14 @@ const PostDetailGuestScreen = () => {
   return (
     <View style={styles.container}>
       
-      {/* 🚨 상단 헤더 영역 복구 및 중앙 정렬 수정 */}
       <View style={styles.headerContainer}>
-        {/* 🚨 왼쪽 공간 확보 (BackButton이 없으므로 더미를 넣습니다) */}
-        {/* PostDetailContent의 TopNavBar와 너비를 맞추기 위해 투명한 더미를 넣습니다. */}
+
         <View style={styles.headerDummySpace} /> 
         
         <Text style={styles.postTypeText}>
           {post.type === 'lost' ? '잃어버렸어요' : '발견했어요'}
         </Text>
         
-        {/* 🚨 오른쪽 공간 확보 (PostDetailContent의 RightSection과 너비를 맞춥니다) */}
         <View style={styles.headerDummySpace} /> 
       </View>
       
@@ -108,12 +103,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // 🚨 상단 헤더 스타일 수정
   headerContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between', // 양 끝으로 밀어내고
+    justifyContent: 'space-between', 
     alignItems: 'center',
-    paddingHorizontal: 16, // PostDetailContent의 navIcon, reportButton과 패딩 통일
+    paddingHorizontal: 16, 
     paddingVertical: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -124,14 +118,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    // flexGrow를 주지 않아 중앙에 고정되도록 합니다.
+ 
   },
-  // 🚨 더미 공간 스타일 추가 (PostDetailContent의 아이콘 영역과 너비를 맞춥니다.)
+  
   headerDummySpace: {
-    width: 40, // BackIcon, ReportButton 영역의 대략적인 크기 (패딩 포함)
-    height: 24, // 텍스트와 높이 맞춤
+    width: 40, 
+    height: 24, 
   },
-  // 🚨 하단 버튼 영역 스타일
+
   bottomArea: {
     position: 'absolute',
     bottom: 0,

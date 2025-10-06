@@ -34,7 +34,7 @@ const PostDetailContent = ({ post, children, isGuest = false }: PostDetailConten
   const userName = post.userMemberName;
   
   const initialMapRegion = {
-    latitude: post.latitude || 37.5665, // Default to Seoul if no coordinate
+    latitude: post.latitude || 37.5665, 
     longitude: post.longitude || 126.9780,
     latitudeDelta: 0.02,
     longitudeDelta: 0.02,
@@ -416,7 +416,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Modal Styles
   modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',

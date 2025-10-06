@@ -1,16 +1,22 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { AuthContext } from '../App';
 
 interface FloatingButtonProps {
   onPress: () => void;
 }
 
 const FloatingButton: React.FC<FloatingButtonProps> = ({ onPress }) => {
+  const { isLoggedIn } = useContext(AuthContext);
+
   return (
-    <TouchableOpacity style={styles.shadowContainer} onPress={onPress}>
+    <TouchableOpacity 
+      style={[styles.shadowContainer, { bottom: isLoggedIn ? 25 : 100 }]} 
+      onPress={onPress}
+    >
       <LinearGradient
-        colors={['#8ED7FF', '#C6E8E0', '#FFFDE4']}
+        colors={['#FFFDE4','#C6E8E0', '#8ED7FF']}
         start={{ x: 0.0, y: 0.5 }}
         end={{ x: 1.0, y: 0.5 }}
         locations={[0.2761, 0.6132, 0.8853]}
@@ -26,7 +32,6 @@ const FloatingButton: React.FC<FloatingButtonProps> = ({ onPress }) => {
 const styles = StyleSheet.create({
   shadowContainer: {
     position: 'absolute',
-    bottom: 25,
     right: 20,
     width: 121,
     height: 44,
@@ -49,13 +54,13 @@ const styles = StyleSheet.create({
   plusText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: 'chacol',
     marginRight: 4,
   },
   buttonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#333',
+    color: 'chacol',
   },
 });
 

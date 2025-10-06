@@ -1,23 +1,49 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useEffect, useState, useRef } from 'react';
-import { Alert, FlatList, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-// 🚨 1. 임포트 추가: DraggableFlatList 및 관련 타입
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import LinearGradient from 'react-native-linear-gradient';
 
-import { addPost, getPostById, geocodeAddress, getCoordinatesByPlaceId, updatePost, getAllDogTypes, searchDogTypes } from '../service/mockApi';
-import { Post, GeocodeResult, PostPayload } from '../types';
-import MapViewComponent from './MapViewComponent';
+// 새로운 아이콘 임포트
+import AiIcon from '../assets/images/ai.svg';
+import FootOffIcon from '../assets/images/footoff.svg';
+import FootIcon from '../assets/images/foot.svg';
+import CameraIcon from '../assets/images/camera.svg';
+
+import {
+  getAllDogTypes,
+  geocodeAddress,
+  getCoordinatesByPlaceId,
+  searchDogTypes,
+} from '../service/mockApi';
+import { GeocodeResult, Post, PostPayload } from '../types';
 import { mapGenderToKorean } from '../utils/format';
+import MapViewComponent from './MapViewComponent';
 
-// 🚨 WritePostForm 내부에서만 사용되는 타입 정의 (any 오류 최종 해결용)
+// --- 타입 정의 ---
+export interface WritePostFormRef {
+  submit: () => void;
+}
+
 interface PhotoItem {
   key: string;
   uri: string;
 }
-
 interface MarkerCoords {
   latitude: number;
   longitude: number;
@@ -30,24 +56,25 @@ interface MapRegion {
   latitudeDelta: number;
   longitudeDelta: number;
 }
-
 interface WritePostFormProps {
   postType: 'lost' | 'witnessed';
   onSave: (
     postData: PostPayload,
     newImageUris: string[],
     existingImageUrls: string[],
-    deletedImageUrls: string[]
+    deletedImageUrls: string[],
   ) => void;
   isSaving: boolean;
   initialData?: Post | null;
+  onFormUpdate: (isValid: boolean) => void;
 }
 
+// 목업 AI 함수
 const mockAiExtraction = (imageUri: string) => {
   console.log('AI가 사진 특징을 분석합니다...', imageUri);
   return {
     species: '푸들',
-    color: '',
+    color: '갈색',
     gender: '수컷',
   };
 };
@@ -57,12 +84,8 @@ const mockAiImageGeneration = (details: any) => {
   return 'https://via.placeholder.com/300/66ccff/ffffff?text=AI+Generated+Pet';
 };
 
-const WritePostForm: React.FC<WritePostFormProps> = ({
-  postType,
-  onSave,
-  isSaving,
-  initialData,
-}) => {
+const WritePostForm = forwardRef<WritePostFormRef, WritePostFormProps>(
+  ({ postType, onSave, isSaving, initialData, onFormUpdate }, ref) => {
   const initialPhotoUrlsRef = useRef<string[]>([]);
   const [deletedImageUrls, setDeletedImageUrls] = useState<string[]>([]);
 
@@ -78,7 +101,6 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
     location: '',
   });
 
-  // 🚨 PhotoItem 타입 사용
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [aiImage, setAiImage] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
@@ -86,46 +108,45 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
-  const [showSpeciesPicker, setShowSpeciesPicker] = useState(false);
+  const [showSpeciesPicker, setShowSpeciesPicker] = useState(false); // 이 변수는 사용되지 않음
   const [speciesQuery, setSpeciesQuery] = useState('');
   const [speciesSuggestions, setSpeciesSuggestions] = useState<string[]>([]);
   const [showSpeciesSuggestions, setShowSpeciesSuggestions] = useState(false);
-  const [allSpecies, setAllSpecies] = useState<string[]>([]); // 🚨 전체 견종 목록 상태
+  const [allSpecies, setAllSpecies] = useState<string[]>([]);
 
-  // 🚨 전체 견종 목록을 불러오는 useEffect
+  // 전체 견종 목록을 불러오는 useEffect
   useEffect(() => {
     const fetchAllSpecies = async () => {
       try {
         const speciesList = await getAllDogTypes();
         setAllSpecies(speciesList);
       } catch (error) {
-        console.error("견종 전체 목록을 가져오는 데 실패했습니다:", error);
+        console.error('견종 전체 목록을 가져오는 데 실패했습니다:', error);
       }
     };
 
     fetchAllSpecies();
   }, []);
 
-  // 지도 초기 영역 설정 (마커가 없더라도 기본적으로 서울 중앙에 위치)
-  const [mapRegion, setMapRegion] = useState<MapRegion>({ // 🚨 타입 적용
+  // 지도 초기 영역 설정
+  const [mapRegion, setMapRegion] = useState<MapRegion>({
     latitude: 37.5665,
     longitude: 126.9780,
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   });
 
-  const [markerCoordinates, setMarkerCoordinates] = useState<MarkerCoords | null>(null); // 🚨 타입 적용
+  const [markerCoordinates, setMarkerCoordinates] = useState<MarkerCoords | null>(null);
   const [searchResults, setSearchResults] = useState<GeocodeResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const navigation = useNavigation();
-
+  // initialData 로드
   useEffect(() => {
     if (initialData) {
       console.log('기존 게시글 데이터 로드:', initialData);
       const koreanGender = mapGenderToKorean(initialData.gender);
-      
+
       const initialUris = initialData.photos || [];
       initialPhotoUrlsRef.current = initialUris;
 
@@ -140,10 +161,7 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
         time: new Date(initialData.date),
         location: initialData.location || '',
       });
-      // 🚨 PhotoItem[] 구조로 변환
-      setPhotos(
-        initialUris.map(uri => ({ key: Math.random().toString(), uri }))
-      );
+      setPhotos(initialUris.map(uri => ({ key: Math.random().toString(), uri })));
       if (initialData.species) {
         setSpeciesQuery(initialData.species);
       }
@@ -164,10 +182,12 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
     }
   }, [initialData]);
 
+  // 입력 변경 핸들러
   const handleInputChange = (key: string, value: string) => {
     setForm(prevForm => ({ ...prevForm, [key]: value }));
   };
 
+  // 장소 검색어 변경 핸들러
   const handleSearchQueryChange = async (value: string) => {
     setSearchQuery(value);
 
@@ -185,10 +205,8 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
     }
   };
 
-  // 🚨 수정: 선택 시 2단계 (Details API 호출) 로직 추가
+  // 장소 선택 핸들러 (좌표 조회 로직 포함)
   const handleLocationSelect = async (item: GeocodeResult) => {
-    // async 추가
-    // 1단계: 검색 UI 닫고 주소 업데이트 (좌표는 아직 0이거나 null)
     setForm(prevForm => ({ ...prevForm, location: item.address }));
     setSearchQuery(item.address);
     setSearchResults([]);
@@ -200,10 +218,8 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
     }
 
     try {
-      // 2단계: Place ID로 실제 좌표 조회
       const coordinates = await getCoordinatesByPlaceId(item.id);
 
-      // 3단계: 조회된 실제 좌표로 지도 상태 업데이트
       setMapRegion({
         latitude: coordinates.latitude,
         longitude: coordinates.longitude,
@@ -219,11 +235,11 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
     } catch (error) {
       console.error('좌표 조회 실패:', error);
       Alert.alert('오류', '선택한 장소의 좌표를 가져오는 데 실패했습니다.');
-      // 좌표 획득 실패 시 마커 초기화
       setMarkerCoordinates(null);
     }
   };
 
+  // 날짜 변경 핸들러
   const handleDateChange = (event: any, selectedDate?: Date) => {
     if (event.type === 'dismissed' || Platform.OS !== 'ios') {
       setShowDatePicker(false);
@@ -233,6 +249,7 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
     }
   };
 
+  // 시간 변경 핸들러
   const handleTimeChange = (event: any, selectedTime?: Date) => {
     if (event.type === 'dismissed' || Platform.OS !== 'ios') {
       setShowTimePicker(false);
@@ -242,13 +259,15 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
     }
   };
 
+  // 견종 선택 핸들러
   const handleSpeciesSelect = (selectedSpecies: string) => {
     setForm(prevForm => ({ ...prevForm, species: selectedSpecies }));
     setSpeciesQuery(selectedSpecies);
-    setShowSpeciesPicker(false);
+    setShowSpeciesPicker(false); // 이 변수는 현재 사용되지 않음
     setShowSpeciesSuggestions(false);
   };
 
+  // 견종 검색어 변경 핸들러
   const handleSpeciesQueryChange = async (query: string) => {
     setSpeciesQuery(query);
     setForm(prevForm => ({ ...prevForm, species: query }));
@@ -263,16 +282,15 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
     }
   };
 
+  // 색상 입력 변경 핸들러
   const handleColorInputChange = (color: string) => {
     setForm(prevForm => ({ ...prevForm, color }));
   };
 
+  // 날짜/시간 피커 렌더링 함수
   const renderDatePicker = () => (
     <Modal visible={showDatePicker} transparent animationType="fade">
-      <TouchableOpacity
-        style={styles.modalOverlay}
-        onPress={() => setShowDatePicker(false)}
-      >
+      <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowDatePicker(false)}>
         <View style={styles.pickerContainer}>
           <DateTimePicker
             value={form.date}
@@ -280,7 +298,6 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
             onChange={(event, selectedDate) => {
               if (Platform.OS !== 'ios') {
-                // Android는 선택 후 자동으로 닫히므로 직접 닫아줘야 함
                 setShowDatePicker(false);
               }
               handleDateChange(event, selectedDate);
@@ -293,10 +310,7 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
 
   const renderTimePicker = () => (
     <Modal visible={showTimePicker} transparent animationType="fade">
-      <TouchableOpacity
-        style={styles.modalOverlay}
-        onPress={() => setShowTimePicker(false)}
-      >
+      <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowTimePicker(false)}>
         <View style={styles.pickerContainer}>
           <DateTimePicker
             value={form.time}
@@ -304,7 +318,6 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
             onChange={(event, selectedTime) => {
               if (Platform.OS !== 'ios') {
-                // Android는 선택 후 자동으로 닫히므로 직접 닫아줘야 함
                 setShowTimePicker(false);
               }
               handleTimeChange(event, selectedTime);
@@ -315,39 +328,17 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
     </Modal>
   );
 
-  const renderSpeciesPicker = () => (
-    <Modal visible={showSpeciesPicker} transparent animationType="fade">
-      <TouchableOpacity
-        style={styles.modalOverlay}
-        onPress={() => setShowSpeciesPicker(false)}
-      >
-        <View style={styles.pickerListContainer}>
-          {allSpecies.map((species, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.pickerItem}
-              onPress={() => handleSpeciesSelect(species)}
-            >
-              <Text>{species}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </TouchableOpacity>
-    </Modal>
-  );
-
+  // 위치 검색 결과 모달 렌더링
   const renderSearchResultsModal = () => (
     <Modal
       visible={isSearching}
       transparent
       animationType="fade"
-      onRequestClose={() => setIsSearching(false)}
-    >
+      onRequestClose={() => setIsSearching(false)}>
       <TouchableOpacity
         style={styles.modalOverlay}
         activeOpacity={1}
-        onPressOut={() => setIsSearching(false)}
-      >
+        onPressOut={() => setIsSearching(false)}>
         <TouchableOpacity activeOpacity={1} style={styles.popupModalContent}>
           <View style={styles.searchBarContainer}>
             <TextInput
@@ -363,22 +354,18 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
             data={searchResults}
             keyExtractor={item => item.id}
             renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.searchResultItem}
-                onPress={() => handleLocationSelect(item)}
-              >
+              <TouchableOpacity style={styles.searchResultItem} onPress={() => handleLocationSelect(item)}>
                 <Text>{item.address}</Text>
               </TouchableOpacity>
             )}
-            ListEmptyComponent={
-              <Text style={styles.emptyText}>검색 결과가 없습니다.</Text>
-            }
+            ListEmptyComponent={<Text style={styles.emptyText}>검색 결과가 없습니다.</Text>}
           />
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
   );
 
+  // 이미지 피커 핸들러
   const handleImagePicker = async () => {
     setImageLoading(true);
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -391,13 +378,13 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
-      selectionLimit: 10 - photos.length, // 이미 선택된 사진 수를 고려
+      selectionLimit: 10 - photos.length,
       quality: 1,
     });
 
     if (!result.canceled && result.assets) {
       const newImageItems: PhotoItem[] = result.assets.map(asset => ({
-        key: Math.random().toString(), // DraggableFlatList를 위한 고유 키
+        key: Math.random().toString(),
         uri: asset.uri,
       }));
 
@@ -419,18 +406,18 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
     setImageLoading(false);
   };
 
+  // 사진 제거
   const removePhoto = (key: string) => {
     const photoToRemove = photos.find(p => p.key === key);
 
     if (photoToRemove) {
-      // If the removed photo was an initial one, add it to the deleted list
       if (initialPhotoUrlsRef.current.includes(photoToRemove.uri)) {
         setDeletedImageUrls(prev => [...prev, photoToRemove.uri]);
       }
       setPhotos(prevPhotos => prevPhotos.filter(photo => photo.key !== key));
     }
 
-    if (photos.length === 1) { // 마지막 사진을 제거하는 경우
+    if (photos.length === 1) {
       setForm(prevForm => ({
         ...prevForm,
         species: '',
@@ -441,10 +428,12 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
     }
   };
 
+  // AI 이미지 제거
   const removeAiImage = () => {
     setAiImage(null);
   };
 
+  // AI 이미지 생성 핸들러
   const handleAiImageGeneration = () => {
     if (photos.length > 0) return;
     setAiImageGenerating(true);
@@ -455,28 +444,27 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
     setAiImageGenerating(false);
   };
 
-  // 🚨 마커 드래그 종료 핸들러
+  // 마커 드래그 종료 핸들러
   const handleMarkerDragEnd = (coordinate: { latitude: number; longitude: number }) => {
-      // 1. 마커 좌표 상태 업데이트
-      setMarkerCoordinates((prev: MarkerCoords | null) => { // 🚨 prev 타입 명시
-        if (!prev) return null;
-        return {
-            ...prev,
-            latitude: coordinate.latitude,
-            longitude: coordinate.longitude,
-        };
-      });
-      
-      // 2. 지도 영역 상태도 업데이트 (마커가 중앙에 오도록)
-      setMapRegion((prev: MapRegion) => ({ // 🚨 prev 타입 명시
-          ...prev,
-          latitude: coordinate.latitude,
-          longitude: coordinate.longitude,
-      }));
+    setMarkerCoordinates((prev: MarkerCoords | null) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        latitude: coordinate.latitude,
+        longitude: coordinate.longitude,
+      };
+    });
 
-      Alert.alert("위치 업데이트", "마커를 드래그하여 위치가 수정되었습니다.");
+    setMapRegion((prev: MapRegion) => ({
+      ...prev,
+      latitude: coordinate.latitude,
+      longitude: coordinate.longitude,
+    }));
+
+    Alert.alert('위치 업데이트', '마커를 드래그하여 위치가 수정되었습니다.');
   };
 
+  // 최종 제출 핸들러
   const handleSubmit = () => {
     if (!markerCoordinates) {
       Alert.alert('필수 정보 누락', '지도에서 정확한 장소를 검색하고 선택해 주세요.');
@@ -511,7 +499,7 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
       latitude: markerCoordinates.latitude,
       longitude: markerCoordinates.longitude,
       name: postType === 'lost' ? form.name : undefined,
-      gender: form.gender === '모름' ? 'NEUTRAL' : (form.gender === '수컷' ? 'MALE' : 'FEMALE'),
+      gender: form.gender === '모름' ? 'NEUTRAL' : form.gender === '수컷' ? 'MALE' : 'FEMALE',
       features: form.features,
     };
 
@@ -521,22 +509,23 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
     }
 
     const newImageUris = finalUris.filter(uri => uri && uri.startsWith('file://'));
-    
+
     const S3_BASE_URL = 'https://gangajikimi-server.s3.ap-northeast-2.amazonaws.com/';
 
     const existingImageUrls = finalUris
-      .filter(uri => 
-        uri && !uri.startsWith('file://') && initialPhotoUrlsRef.current.includes(uri)
-      )
+      .filter(uri => uri && !uri.startsWith('file://') && initialPhotoUrlsRef.current.includes(uri))
       .map(uri => uri.split('?')[0].replace(S3_BASE_URL, ''));
 
     const validDeletedImageUrls = deletedImageUrls
       .filter(uri => uri && uri.length > 0)
       .map(uri => uri.split('?')[0].replace(S3_BASE_URL, ''));
-    
+
     onSave(postData, newImageUris, existingImageUrls, validDeletedImageUrls);
   };
 
+  const isGenerateImageEnabled = !!(form.species && form.color);
+
+  // 폼 유효성 검사
   const isFormValid =
     form.title &&
     form.species &&
@@ -547,107 +536,109 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
     (photos.length > 0 || aiImage) &&
     markerCoordinates;
 
+  useImperativeHandle(ref, () => ({
+    submit: handleSubmit,
+  }));
+
+  useEffect(() => {
+    onFormUpdate(!!isFormValid);
+  }, [isFormValid, onFormUpdate]);
+
   const formattedDate = form.date.toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'long',
+    month: 'numeric',
     day: 'numeric',
   });
   const formattedTime = form.time.toLocaleTimeString('ko-KR', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
+    hour12: false, // 24시간 형식 (오전/오후 제거)
   });
 
-  // 🚨 DraggableFlatList를 위한 렌더 아이템 함수
+  // DraggableFlatList 렌더 아이템 함수
   const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<PhotoItem>) => {
     return (
       <ScaleDecorator>
-        <TouchableOpacity
-          onLongPress={drag} // 길게 누르면 드래그 시작
-          disabled={isActive}
-          style={styles.imageSlot}
-        >
-          <Image source={{ uri: item.uri }} style={styles.uploadedImage} />
-          <TouchableOpacity
-            style={styles.removeImageButton}
-            onPress={() => removePhoto(item.key)} // key를 사용해 삭제
-          >
-            <Text style={styles.removeImageText}>x</Text>
+        <TouchableOpacity onLongPress={drag} disabled={isActive} style={styles.thumbnailContainer}>
+          <Image source={{ uri: item.uri }} style={styles.thumbnail} />
+          <TouchableOpacity style={styles.removeButton} onPress={() => removePhoto(item.key)}>
+            <Text style={styles.removeButtonText}>×</Text>
           </TouchableOpacity>
         </TouchableOpacity>
       </ScaleDecorator>
     );
   };
 
-  // 🚨 2. return 문을 GestureHandlerRootView로 감싸기
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sectionDescription}>
-          사진을 올리면 AI가 품종을 자동으로 입력해줘요.
-        </Text>
-
-              <View style={styles.imageUploadSection}>
-        {/* 1. 사진 추가 버튼 */}
-        {!aiImage && (
-          <TouchableOpacity
-            style={styles.addPhotoSlot}
-            onPress={handleImagePicker}
-          >
-            <Text style={styles.addPhotoText}>
-              {`사진 추가
-(${photos.length}/10)`}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* 2. 드래그 가능한 이미지 목록 (DraggableFlatList를 View로 감싸서 너비 확보) */}
-        <View style={styles.draggableListWrapper}>
-          <DraggableFlatList
-            data={photos}
-            onDragEnd={({ data }) => setPhotos(data)} // 드래그 종료 시 데이터 업데이트
-            keyExtractor={item => item.key}
-            renderItem={renderDraggableItem}
-            horizontal // 가로 스크롤
-            showsHorizontalScrollIndicator={false}
-            // contentContainerStyle={{ alignItems: 'flex-start' }} // 이 줄은 제거
-            style={styles.draggableFlatList} // 새로운 스타일 적용
-          />
+      <View style={styles.formContainer}>
+        {/* 강아지 사진 섹션 */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.label}>강아지 사진</Text>
+          <View style={styles.imageUploadRow}>
+            <TouchableOpacity style={styles.addPhotoButton} onPress={handleImagePicker}>
+              {imageLoading ? (
+                <ActivityIndicator color="#9CA3AF" />
+              ) : (
+                <>
+                  <CameraIcon />
+                  <Text style={styles.addPhotoButtonText}>({photos.length}/10)</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <View style={styles.draggableListWrapper}>
+              {photos.length > 0 ? (
+                <DraggableFlatList
+                  data={photos}
+                  onDragEnd={({ data }) => setPhotos(data)}
+                  keyExtractor={item => item.key}
+                  renderItem={renderDraggableItem}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                />
+              ) : (
+                <View style={styles.photoPlaceholder} />
+              )}
+            </View>
+          </View>
         </View>
-      </View>
 
-        <View style={styles.formSection}>
+        {/* 제목 섹션 */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.label}>제목</Text>
           <TextInput
             style={styles.input}
-            placeholder="제목"
-            placeholderTextColor="#666"
+            placeholder="글 제목"
+            placeholderTextColor="#9CA3AF"
             value={form.title}
             onChangeText={text => handleInputChange('title', text)}
           />
         </View>
 
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>반려견 기본 정보</Text>
+        {/* 강아지 기본 정보 섹션 */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.label}>강아지 기본 정보</Text>
           {postType === 'lost' && (
-            <TextInput
-              style={styles.input}
-              placeholder="반려견 이름"
-              placeholderTextColor="#666"
-              value={form.name}
-              onChangeText={text => handleInputChange('name', text)}
-            />
+            <View style={styles.inputRow}>
+              <Text style={styles.inputLabel}>이름</Text>
+              <TextInput
+                style={[styles.input, styles.halfInput]}
+                placeholder="강아지 이름 입력"
+                placeholderTextColor="#9CA3AF"
+                value={form.name}
+                onChangeText={text => handleInputChange('name', text)}
+              />
+            </View>
           )}
-          <View style={styles.row}>
+          <View style={styles.inputRow}>
+            <Text style={styles.inputLabel}>품종</Text>
             <View style={styles.halfInputContainer}>
               <TextInput
-                style={styles.speciesInput}
-                placeholder="품종 (AI 자동 입력)"
-                placeholderTextColor="#666"
+                style={[styles.input, styles.halfInput]}
+                placeholder="사진 등록 시 품종이 자동으로 입력돼요!"
+                placeholderTextColor="#9CA3AF"
                 value={speciesQuery}
                 onChangeText={handleSpeciesQueryChange}
-                onFocus={() =>
-                  setShowSpeciesSuggestions(speciesSuggestions.length > 0)
-                }
+                onFocus={() => setShowSpeciesSuggestions(speciesSuggestions.length > 0)}
               />
               {showSpeciesSuggestions && (
                 <View style={styles.suggestionsContainer}>
@@ -655,353 +646,390 @@ const WritePostForm: React.FC<WritePostFormProps> = ({
                     <TouchableOpacity
                       key={index}
                       style={styles.suggestionItem}
-                      onPress={() => handleSpeciesSelect(suggestion)}
-                    >
+                      onPress={() => handleSpeciesSelect(suggestion)}>
                       <Text style={styles.suggestionText}>{suggestion}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
             </View>
+          </View>
+          <View style={styles.inputRow}>
+            <Text style={styles.inputLabel}>색상</Text>
             <TextInput
-              style={[styles.halfInput, { marginLeft: 8 }]}
-              placeholder="색상 (자유 입력)"
-              placeholderTextColor="#666"
+              style={[styles.input, styles.halfInput]}
+              placeholder="예: 흰색, 갈색 ..."
+              placeholderTextColor="#9CA3AF"
               value={form.color}
               onChangeText={handleColorInputChange}
             />
           </View>
-
           <View style={styles.genderContainer}>
             <Text style={styles.genderLabel}>성별</Text>
-            {['암컷', '수컷', '모름'].map(genderOption => (
+            {['암컷', '수컷', '모름'].map(g => (
               <TouchableOpacity
-                key={genderOption}
-                style={styles.genderOption}
-                onPress={() => handleInputChange('gender', genderOption)}
-              >
-                <View style={styles.radioIcon}>
-                  {form.gender === genderOption && <View style={styles.radioChecked} />}
+                key={g}
+                style={styles.radioContainer}
+                onPress={() => handleInputChange('gender', g)}>
+                <View style={[styles.radio, form.gender === g && styles.radioSelected]}>
+                  {form.gender === g && <View style={styles.radioInnerCircle} />}
                 </View>
-                <Text style={styles.genderOptionText}>{genderOption}</Text>
+                <Text style={styles.radioLabel}>{g}</Text>
               </TouchableOpacity>
             ))}
           </View>
           <TextInput
-            style={styles.multiLineInput}
-            placeholder="기타 성격, 특징, 착용물 등 자세히 작성"
-            placeholderTextColor="#666"
+            style={[styles.input, styles.multilineInput]}
+            placeholder={`강아지의 상세 정보, ${postType === 'lost' ? '실종' : '발견'} 당시 상황을 입력해주세요. 자세히 입력할수록 매칭 확률이 높아져요.`}
+            placeholderTextColor="#9CA3AF"
             multiline
-            numberOfLines={4}
             value={form.features}
             onChangeText={text => handleInputChange('features', text)}
           />
         </View>
 
         {photos.length === 0 && (
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>AI 생성 이미지</Text>
-            <Text style={styles.aiImageDescription}>
-              사진이 없을 경우, 입력한 특징으로 AI 이미지를 생성해드려요.
-            </Text>
+          <View style={styles.sectionContainer}>
+            <Text style={[styles.label, styles.aiImageTitle]}>사진이 없으면 글을 등록할 수 없어요.</Text>
+            <Text style={styles.aiHelperText}>입력하신 정보로 강아지 이미지를 만들어드릴게요!</Text>
             {aiImage && (
               <View style={styles.aiImageContainer}>
                 <Image source={{ uri: aiImage }} style={styles.aiGeneratedImage} />
-                <TouchableOpacity
-                  style={styles.removeAiImageButton}
-                  onPress={removeAiImage}
-                >
-                  <Text style={styles.removeImageText}>×</Text>
+                <TouchableOpacity style={styles.removeAiImageButton} onPress={removeAiImage}>
+                  <Text style={styles.removeAiImageText}>×</Text>
                 </TouchableOpacity>
               </View>
             )}
             {!aiImage && (
-              <TouchableOpacity
-                style={[ // 🚨 수정: 배열 괄호 닫힘
-                  styles.aiGenerateButton,
-                  aiImageGenerating && styles.disabledButton,
-                ]}
-                onPress={handleAiImageGeneration}
-                disabled={aiImageGenerating}
-              >
-                <Text style={styles.aiGenerateButtonText}>
-                  {aiImageGenerating ? 'AI 이미지 생성 중...' : '이미지 생성하기'}
-                </Text>
-              </TouchableOpacity>
+              isGenerateImageEnabled ? (
+                <LinearGradient
+                  colors={['#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#9400D3']}
+                  useAngle={true}
+                  angle={135}
+                  angleCenter={{ x: 0.5, y: 0.5 }}
+                  style={styles.rainbowBorder}
+                >
+                  <TouchableOpacity
+                    style={[styles.aiButton, styles.aiButtonEnabled]}
+                    onPress={handleAiImageGeneration}
+                    disabled={aiImageGenerating}
+                  >
+                    {aiImageGenerating ? (
+                      <ActivityIndicator color="#FFF" />
+                    ) : (
+                      <>
+                        <AiIcon />
+                        <Text style={styles.aiButtonText}>강아지 이미지 생성하기</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </LinearGradient>
+              ) : (
+                <View style={styles.grayBorder}>
+                  <TouchableOpacity
+                    style={[styles.aiButton, styles.aiButtonDisabled]}
+                    disabled={true}
+                  >
+                    <AiIcon />
+                    <Text style={[styles.aiButtonText, styles.aiButtonTextDisabled]}>강아지 이미지 생성하기</Text>
+                  </TouchableOpacity>
+                </View>
+              )
             )}
           </View>
         )}
 
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>
-            {postType === 'lost' ? '실종 정보' : '발견 정보'}
-          </Text>
-          <View style={styles.row}>
-            <TouchableOpacity
-              style={[styles.input, styles.halfInput]}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={{ color: '#333' }}>{formattedDate}</Text>
+        {/* 실종/발견 정보 섹션 */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.label}>{postType === 'lost' ? '실종 정보' : '발견 정보'}</Text>
+          <View style={styles.rowInputContainer}>
+            <TouchableOpacity style={[styles.input, styles.halfInput]} onPress={() => setShowDatePicker(true)}>
+              <Text style={styles.dateText}>{formattedDate}</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.input, styles.halfInput, { marginLeft: 8 }]}
-              onPress={() => setShowTimePicker(true)}
-            >
-              <Text style={{ color: '#333' }}>{formattedTime}</Text>
+            <TouchableOpacity style={[styles.input, styles.halfInput]} onPress={() => setShowTimePicker(true)}>
+              <Text style={styles.dateText}>{formattedTime}</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity
-            style={styles.input}
-            onPress={() => {
-              setIsSearching(true);
-              setSearchQuery(form.location);
-            }}
-          >
-            <Text style={{ color: form.location ? '#333' : '#888' }}>
-              {form.location || '장소 (위치 검색)'}
-            </Text>
-          </TouchableOpacity>
+  style={[styles.input, styles.locationInput]}
+  onPress={() => {
+    setIsSearching(true);
+    setSearchQuery(form.location);
+  }}>
+  {form.location ? <FootIcon /> : <FootOffIcon />}
+  {/* 👇 Text를 View로 감싸고, View에 flex: 1을 적용합니다. */}
+  <View style={{ flex: 1 }}> 
+    <Text style={styles.locationText}>
+      {form.location || (postType === 'lost' ? '강아지가 실종된 위치를 검색하세요.' : '강아지를 발견한 위치를 검색하세요.')}
+    </Text>
+  </View>
+</TouchableOpacity>
           <View style={styles.mapContainer}>
             <MapViewComponent
               initialRegion={mapRegion}
               markerCoords={markerCoordinates}
-              // 🚨 핵심: 드래그 종료 핸들러 연결
-              onMarkerDragEnd={handleMarkerDragEnd} 
+              onMarkerDragEnd={handleMarkerDragEnd}
             />
           </View>
         </View>
 
+        {/* Modals */}
         {showDatePicker && renderDatePicker()}
         {showTimePicker && renderTimePicker()}
-        {showSpeciesPicker && renderSpeciesPicker()}
         {isSearching && renderSearchResultsModal()}
 
-        <TouchableOpacity
-          style={[styles.submitButton, !isFormValid && styles.disabledButton]}
-          onPress={handleSubmit}
-          disabled={!isFormValid}
-        >
-          <Text style={styles.submitButtonText}>작성 완료</Text>
-        </TouchableOpacity>
-      </ScrollView>
+        {/* 작성 완료 버튼은 WritePostScreen으로 이동 */}
+      </View>
     </GestureHandlerRootView>
   );
-};
+});
+
 const styles = StyleSheet.create({
-  content: {
-    padding: 16,
-    paddingBottom: 40,
+  formContainer: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: 'rgba(0, 0, 0, 0.25)',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 5,
+    marginTop: 5,
   },
-  sectionDescription: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  imageUploadSection: {
-    marginBottom: 20,
-    flexDirection: 'row', // 🚨 필수: 버튼과 리스트가 가로로 나열되도록 설정
-    alignItems: 'center',
-  },
-  imageSlotContainer: {
-    // flexDirection: 'row',
-    // marginBottom: 8,
-    // minHeight: 100, // DraggableFlatList가 작동하도록 최소 높이 설정
-  },
-  addPhotoSlot: {
-    width: 100,
-    height: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    backgroundColor: '#f7f7f7',
-    marginRight: 8,
-    flexShrink: 0, // 🚨 필수: 공간이 부족해도 이 버튼은 찌그러지지 않도록 고정
-  },
-  // 🚨 스타일 정의가 이 안에 있어야 합니다. (스타일 오류 해결)
-  addPhotoText: {
-    fontSize: 12,
-    color: '#888',
-    textAlign: 'center',
-  },
-  draggableListWrapper: {
-    flex: 1, 
-    height: 100, // DraggableFlatList의 높이를 명시적으로 지정
-  },
-  draggableFlatList: {
-    // DraggableFlatList 자체에는 추가 스타일 없이 래퍼를 통해 크기를 조정
-  },
-  imageSlot: {
-    width: 100,
-    height: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  uploadedImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  removeImageButton: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 10,
-    width: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeImageText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    fontSize: 16,
-  },
-  formSection: {
+  sectionContainer: {
     marginBottom: 24,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    color: '#333',
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  halfInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
+  label: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 13,
+    color: '#1F2937',
+  },
+  multilineInput: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+    paddingTop: 12,
+  },
+  rowInputContainer: {
+    flexDirection: 'row',
+    gap: 8, // flex gap 속성 사용
+    marginBottom: 8,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  inputLabel: {
+    width: 40,
+    fontSize: 14,
+    color: '#424242',
+    marginRight: 10,
   },
   halfInputContainer: {
     flex: 1,
     position: 'relative',
   },
-  dropdownPlaceholder: {
-    color: '#888',
-    fontSize: 16,
+  halfInput: {
+    flex: 1,
   },
-  dropdownIcon: {
+  imageUploadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addPhotoButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  addPhotoButtonText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  draggableListWrapper: {
+    flex: 1,
+    height: 80, // DraggableFlatList가 보일 수 있도록 높이 지정
+  },
+  photoPlaceholder: {
+    flex: 1,
+    height: 80,
+    // 필요하다면 이곳에 플레이스홀더 스타일 추가
+  },
+  thumbnailContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 8,
+    position: 'relative',
+    overflow: 'hidden', // 이미지가 튀어나가지 않도록
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  removeButton: {
     position: 'absolute',
-    right: 12,
-    top: 12,
+    top: -4,
+    right: -4, // 모서리에 더 가깝게
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1, // 버튼이 이미지 위에 오도록
+  },
+  removeButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 12,
   },
   genderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginTop: 16,
+    marginBottom: 8,
   },
   genderLabel: {
-    fontSize: 16,
-    marginRight: 16,
-    color: '#333',
-    fontWeight: 'bold',
+    fontSize: 14,
+    color: '#424242',
+    marginRight: 28,
+    fontWeight: 'normal', // 피그마 디자인에 맞게 bold 제거
+    marginBottom: 20,
   },
-  genderOption: {
+  radioContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 20,
+    marginRight: 16,
+        marginBottom: 20,
   },
-  radioIcon: {
+  radio: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#ccc',
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 6,
+    backgroundColor: '#FFF',
   },
-  radioChecked: {
+  radioSelected: {
+    borderColor: '#8ED7FF', // 활성화 색상
+    backgroundColor: '#8ED7FF',
+  },
+  radioInnerCircle: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#333',
+    backgroundColor: '#FFF', // 내부 원은 흰색
   },
-  genderOptionText: {
-    fontSize: 16,
-    color: '#333',
+  radioLabel: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#424242',
   },
-  multiLineInput: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    fontSize: 16,
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  mapContainer: {
-    height: 200,
-    width: '100%',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  aiImageDescription: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 12,
+  aiImageTitle: {
     textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '500', // Medium
+    color: '#48BEFF',
+    marginBottom: 4,
   },
-  aiGenerateButton: {
-    backgroundColor: '#e0e0e0',
+  aiHelperText: {
+    textAlign: 'center',
+    color: '#48BEFF',
+    fontSize: 13,
+    marginBottom: 16,
+  },
+  aiButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingVertical: 12,
     borderRadius: 8,
+  },
+  aiButtonEnabled: {
+    backgroundColor: '#2563EB', // 파란색
+  },
+  aiButtonDisabled: {
+    backgroundColor: '#D1D5DB', // 회색
+  },
+  aiButtonText: {
+    marginLeft: 8,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  aiButtonTextDisabled: {
+    color: '#A0A0A0',
+  },
+  rainbowBorder: {
+    borderRadius: 10, // aiButton의 borderRadius + padding
+    padding: 2,
+  },
+  grayBorder: {
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+  },
+  dateText: {
+    fontSize: 15,
+    color: '#1F2937', // 날짜/시간 텍스트 색상
+  },
+  locationInput: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  aiGenerateButtonText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: 'bold',
+  locationText: {
+    fontSize: 14,
+    color: '#6B7280', // 위치 텍스트 색상 (검색 전)
+    marginLeft: 8,
   },
-  aiGeneratedImage: {
-    width: '100%',
-    height: 200,
-    resizeMode: 'cover',
+  mapContainer: {
+    height: 180,
     borderRadius: 8,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    overflow: 'hidden',
+    marginTop: 8,
+    borderWidth: 1, // 지도 테두리 추가
+    borderColor: '#E5E7EB',
   },
   submitButton: {
-    backgroundColor: '#FF8C00',
-    paddingVertical: 15,
+    backgroundColor: '#FF6347', // 피그마 디자인의 핑크색
+    paddingVertical: 16,
     borderRadius: 8,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 8,
   },
   submitButtonText: {
+    color: '#FFFFFF',
     fontSize: 18,
-    color: '#fff',
     fontWeight: 'bold',
   },
   disabledButton: {
-    backgroundColor: '#D3D3D3',
+    backgroundColor: '#D1D5DB', // 비활성화 버튼 색상
   },
+  // Modals (기존과 동일)
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
@@ -1009,22 +1037,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
   },
   pickerContainer: {
-    backgroundColor: '#333',
+    backgroundColor: 'white', // 피커 배경색 변경
     borderRadius: 12,
     padding: 16,
     width: '80%',
-  },
-  pickerListContainer: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 10,
-    width: '80%',
-    maxHeight: 200,
-  },
-  pickerItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
     alignItems: 'center',
   },
   popupModalContent: {
@@ -1054,6 +1070,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     fontSize: 16,
+    color: '#333',
   },
   searchResultItem: {
     padding: 16,
@@ -1065,15 +1082,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
     color: '#888',
   },
-  speciesInput: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
-    flex: 1,
-  },
   suggestionsContainer: {
     position: 'absolute',
     top: 50,
@@ -1081,10 +1089,10 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#E5E7EB',
     borderRadius: 8,
     maxHeight: 150,
-    zIndex: 1000,
+    zIndex: 10, // 다른 요소 위에 나타나도록
     elevation: 5,
   },
   suggestionItem: {
@@ -1093,12 +1101,21 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
   },
   suggestionText: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: 15,
+    color: '#1F2937',
   },
   aiImageContainer: {
     position: 'relative',
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  aiGeneratedImage: {
+    width: '100%',
+    height: 200,
+    resizeMode: 'cover',
   },
   removeAiImageButton: {
     position: 'absolute',

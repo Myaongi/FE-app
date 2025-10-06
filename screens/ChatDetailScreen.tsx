@@ -49,7 +49,6 @@ const ChatDetailScreen = () => {
       
       console.log(`FETCH: 과거 메시지 ${newMessages.length}개 로드 성공. (페이지 ${pageNum})`);
 
-      // Mark fetched messages as read
       newMessages.forEach(msg => {
         if (msg.senderId !== currentUserId && !msg.read) {
           markMessageAsRead(parseInt(msg.id));
@@ -97,9 +96,6 @@ const ChatDetailScreen = () => {
     fetchInitialData();
   }, [postId, type, isLoggedIn, userProfile, navigation]);
 
-  // =========================================================================
-  // ⭐ 핵심 변경 지점: `deactivateClient` 호출을 `unsubscribe`로 변경 ⭐
-  // =========================================================================
   useFocusEffect(
     useCallback(() => {
       if (!chatRoomId || !currentUserId) {
@@ -185,9 +181,6 @@ const ChatDetailScreen = () => {
       };
     }, [chatRoomId, currentUserId])
   );
-  // =========================================================================
-  // ⭐ 핵심 변경 지점 끝 ⭐
-  // =========================================================================
 
   const handleSendMessage = () => {
     const messageContent = inputText.trim();
@@ -343,7 +336,7 @@ const ChatDetailScreen = () => {
   );
 };
 
-// 보내주신 스타일 코드를 그대로 사용합니다.
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
