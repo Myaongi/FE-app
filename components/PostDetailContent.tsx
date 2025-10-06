@@ -15,7 +15,7 @@ import {
 import BackIcon from '../assets/images/back.svg';
 import WarningIcon from '../assets/images/warning.svg';
 import { Post, StackNavigation } from '../types';
-import { formatRelativeTime, formatDisplayDate } from '../utils/time';
+import { formatDisplayDate } from '../utils/time';
 import { mapStatusToKorean, mapGenderToKorean } from '../utils/format';
 import MapViewComponent from './MapViewComponent';
 
@@ -32,7 +32,6 @@ const PostDetailContent = ({ post, children, isGuest = false }: PostDetailConten
   const modalScrollViewRef = useRef<ScrollView>(null);
 
   const userName = post.userMemberName;
-  const relativePostTime = formatRelativeTime(post.uploadedAt);
   
   const initialMapRegion = {
     latitude: post.latitude || 37.5665, // Default to Seoul if no coordinate
@@ -77,7 +76,7 @@ const PostDetailContent = ({ post, children, isGuest = false }: PostDetailConten
         userName: userName,
         title: post.title,
         location: post.location,
-        time: relativePostTime
+        time: post.timeAgo || ''
       }
     });
   };
@@ -105,7 +104,7 @@ const PostDetailContent = ({ post, children, isGuest = false }: PostDetailConten
             {post.location}
           </Text>
           <Text style={styles.dateTimeText}>
-            등록 시간: {relativePostTime}
+            등록 시간: {post.timeAgo}
           </Text>
         </View>
         <View style={styles.rightSection}>

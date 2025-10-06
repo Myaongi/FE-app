@@ -60,15 +60,12 @@ const LoginScreen = () => {
       if (response.isSuccess && response.result) {
         console.log('🎉 [LOGIN SCREEN] 로그인 성공, 사용자 정보 설정 중');
         
-        signIn(response.result); 
+        await signIn(response.result); 
 
-        setTimeout(() => {
-            navigationRef.current?.reset({
-                index: 0,
-                routes: [{ name: 'RootTab' as any }], 
-            });
-            console.log('👤 [LOGIN SCREEN] 전역 Ref로 스택 초기화 완료');
-        }, 10); 
+        navigationRef.current?.reset({
+            index: 0,
+            routes: [{ name: 'RootTab' as any }], 
+        });
 
         try {
             console.log('🔔 [LOGIN SCREEN] 푸시 알림 설정 시작');
@@ -80,9 +77,11 @@ const LoginScreen = () => {
             
       } else {
         console.log('❌ [LOGIN SCREEN] 로그인 실패:', response.message);
+        Alert.alert('로그인 실패', response.message || '이메일 또는 비밀번호를 확인해주세요.');
       }
     } catch (err: any) {
       console.log('🚨 [LOGIN SCREEN] 에러 발생:', err);
+      Alert.alert('로그인 오류', '로그인 중 문제가 발생했습니다. 다시 시도해주세요.');
       console.error(err);
     }
   };

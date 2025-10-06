@@ -12,7 +12,7 @@ const MatchScreen = () => {
   const { postId } = (route.params || { postId: '1' }) as { postId: string };
 
   const authContext = useContext(AuthContext); 
-  const { isLoggedIn, userMemberName } = authContext || { isLoggedIn: false, userMemberName: null };
+  const { isLoggedIn, userMemberName } = authContext;
   const currentUserId = userMemberName; 
 
   const [matches, setMatches] = useState<Match[]>([]);

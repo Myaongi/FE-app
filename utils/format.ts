@@ -23,3 +23,14 @@ export const mapGenderToKorean = (gender: Post['gender'] | undefined | null): '�
       return '알 수 없음';
   }
 };
+
+export const mapLostTypeToKorean = (lostType: string): string => {
+  switch (lostType) {
+    case 'LOST':
+      return '실종';
+    case 'FOUND':
+      return '발견';
+    default:
+      return '귀가 완료';
+  }
+};

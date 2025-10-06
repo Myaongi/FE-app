@@ -6,11 +6,11 @@ import * as Notifications from 'expo-notifications';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import {
-  getChatRoomsByUserId,
   getNewMatchCount,
   getUserProfile, // 프로필 조회 함수 임포트
   saveUserLocation,
   savePushToken,
+  getMyChatRooms,
 } from './service/mockApi';
 
 // 화면 컴포넌트들
@@ -38,7 +38,7 @@ import MyPageOffIcon from './assets/images/mypageoff.svg';
 import MyPageOnIcon from './assets/images/mypageon.svg';
 import {
   AuthContextType,
-  AuthResult,
+  AuthResult, // AuthResult 임포트
   AuthStackParamList,
   RootStackParamList,
   RootTabParamList,
@@ -51,7 +51,15 @@ import { startLocationUpdates } from './utils/location';
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const MainStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-export const AuthContext = React.createContext<AuthContextType | null>(null);
+export const AuthContext = React.createContext<AuthContextType & { userMemberId: number | null }>({
+  isLoggedIn: false,
+  userMemberName: null,
+  userProfile: null,
+  userMemberId: null, // AuthContextType에 추가된 userMemberId를 기본값으로 설정
+  signIn: async () => {},
+  signOut: () => {},
+  fetchUserProfile: async () => {},
+});
 export const navigationRef = React.createRef<NavigationContainerRef<any>>();
 
 // 🚨 수정 1: NotificationBehavior 타입 요구사항을 충족시키기 위해 shouldShowBanner와 shouldList를 추가
@@ -71,15 +79,16 @@ function RootTabNavigator() {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const authContext = React.useContext(AuthContext);
 
-  const { isLoggedIn, userMemberName } = authContext || { isLoggedIn: false, userMemberName: null };
+  // userMemberName 대신 userMemberId를 사용하여 API 호출 조건 확인
+  const { isLoggedIn, userMemberId } = authContext;
 
   const fetchBadgeCounts = async () => {
-    if (!isLoggedIn || !userMemberName) return;
+    if (!isLoggedIn || !userMemberId) return;
     try {
       const newMatches = await getNewMatchCount();
       setMatchCount(newMatches);
-      const chatRooms = await getChatRoomsByUserId(userMemberName);
-      const totalUnread = chatRooms.reduce((sum, room) => sum + (room.unreadCounts[userMemberName] || 0), 0);
+      const chatRooms = await getMyChatRooms();
+      const totalUnread = chatRooms.reduce((sum, room) => sum + (room.unreadCount || 0), 0);
       setUnreadChatCount(totalUnread);
     } catch (error) {
       console.error("Failed to fetch badge counts:", error);
@@ -90,7 +99,7 @@ function RootTabNavigator() {
     if (isLoggedIn) {
       fetchBadgeCounts();
     }
-  }, [isLoggedIn, userMemberName]);
+  }, [isLoggedIn, userMemberId]); // userMemberName 대신 userMemberId를 의존성 배열에 추가
 
   return (
     <Tab.Navigator 
@@ -177,6 +186,8 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userMemberName, setUserMemberName] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  // 🚨 추가: userMemberId 상태 관리 (userProfile.memberId가 있지만 명시적으로 관리)
+  const [userMemberId, setUserMemberId] = useState<number | null>(null); 
   const [isLoading, setIsLoading] = useState(true);
 
   const appState = useRef(AppState.currentState);
@@ -210,14 +221,19 @@ export default function App() {
     }
   }, []);
 
+  // 🚨 4. `signOut` 함수 수정: AsyncStorage에서 `userMemberId` 제거
   const signOut = useCallback(async () => {
     setIsLoggedIn(false);
     setUserMemberName(null);
     setUserProfile(null);
+    setUserMemberId(null); // 상태에서도 제거
     stopPeriodicLocationUpdates(); // 로그아웃 시 위치 업데이트 중지
     try {
       await AsyncStorage.removeItem('accessToken');
       await AsyncStorage.removeItem('userMemberName');
+      await AsyncStorage.removeItem('userMemberId');
+      // AuthResult에 refreshToken이 포함되므로, 필요하다면 refreshToken도 제거
+      await AsyncStorage.removeItem('refreshToken'); 
     } catch (error) {
       console.error('로그아웃 실패', error);
     }
@@ -226,7 +242,11 @@ export default function App() {
   const fetchUserProfile = useCallback(async () => {
     try {
       const profile = await getUserProfile();
+      console.log('DEBUG: App.tsx - Profile fetched:', profile);
       setUserProfile(profile);
+      // fetchUserProfile에서 받아온 userProfile의 memberId로 userMemberId 상태 업데이트
+      setUserMemberId(profile.memberId); 
+      console.log('DEBUG: App.tsx - userProfile state after set:', profile);
     } catch (error) {
       console.error('프로필 정보 조회 실패:', error);
       await signOut();
@@ -234,41 +254,80 @@ export default function App() {
   }, [signOut]);
 
   useEffect(() => {
+    // 🚨 3. `bootstrapAsync` 함수 수정: `userMemberId` 검색 및 `userProfile` 구성
     const bootstrapAsync = async () => {
       try {
         const token = await AsyncStorage.getItem('accessToken');
         const memberName = await AsyncStorage.getItem('userMemberName');
-        if (token && memberName) {
+        // 🚨 변경: AsyncStorage에서 userMemberId를 검색
+        const memberIdString = await AsyncStorage.getItem('userMemberId'); 
+        
+        console.log('DEBUG: App.tsx - Retrieved token:', token);
+        console.log('DEBUG: App.tsx - Retrieved memberName:', memberName);
+        console.log('DEBUG: App.tsx - Retrieved memberIdString:', memberIdString);
+
+        if (token && memberName && memberIdString) {
+          const memberId = Number(memberIdString);
           setIsLoggedIn(true);
           setUserMemberName(memberName);
-          await fetchUserProfile();
+          setUserMemberId(memberId); // 검색된 memberId로 상태 설정
+          
+          // 🚨 변경: 검색된 userMemberId를 사용하여 userProfile 객체를 구성
+          setUserProfile({
+            memberId: memberId,
+            username: memberName,
+            email: '', // 로그인 시 이메일 정보가 없으므로 빈 문자열로 설정
+          });
+        } else {
+          // 토큰이나 memberName, memberId 중 하나라도 없으면 로그아웃 처리
+          await signOut();
         }
       } catch (e) {
         console.error('자동 로그인 실패', e);
+        await signOut();
       }
       setIsLoading(false);
     };
 
     bootstrapAsync();
-  }, [fetchUserProfile]);
+  }, [signOut]); // signOut을 의존성 배열에 추가
 
   const authContext = useMemo(() => ({
     isLoggedIn,
     userMemberName,
     userProfile,
+    // 🚨 변경: userProfile?.memberId 대신 userMemberId 상태를 사용
+    userMemberId: userMemberId, 
+    // 🚨 2. `signIn` 함수 수정: `authResult.userId`를 예상하고 처리
     signIn: async (authResult: AuthResult) => {
+      // AuthResult 타입에 userId가 포함되어 있다고 가정하고 사용합니다.
+      const { userId, memberName, accessToken, refreshToken } = authResult; 
+
       setIsLoggedIn(true);
-      setUserMemberName(authResult.memberName);
+      setUserMemberName(memberName);
+      setUserMemberId(userId); // userId 상태 업데이트
+
       try {
-        await AsyncStorage.setItem('userMemberName', authResult.memberName);
-        await fetchUserProfile();
+        await AsyncStorage.setItem('userMemberName', memberName);
+        await AsyncStorage.setItem('accessToken', accessToken); // accessToken 저장
+        // 🚨 변경: authResult.userId를 userMemberId로 저장
+        await AsyncStorage.setItem('userMemberId', userId.toString()); 
+        // refreshToken 저장 (AuthResult에 포함되었다고 가정)
+        await AsyncStorage.setItem('refreshToken', refreshToken);
+
+        // 🚨 변경: authResult.userId를 사용하여 userProfile 객체를 구성
+        setUserProfile({
+          memberId: userId,
+          username: memberName,
+          email: '', // 로그인 시 이메일 정보가 없으므로 빈 문자열로 설정
+        });
       } catch (error) {
         console.error('로그인 후 처리 실패', error);
       }
     },
     signOut,
     fetchUserProfile,
-  }), [isLoggedIn, userMemberName, userProfile, signOut, fetchUserProfile]);
+  }), [isLoggedIn, userMemberName, userProfile, userMemberId, signOut, fetchUserProfile]); // userMemberId를 의존성 배열에 추가
 
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppState['currentState']) => {

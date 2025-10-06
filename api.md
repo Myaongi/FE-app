@@ -614,3 +614,227 @@ Responses :
   "요크셔테리어",
   "비글"
 ]
+
+**채팅, 메세지 관련 api명세**
+1:1채팅 자체는 웹소켓을 이용하고 그 외는 RestApi를 이용한다.
+
+/api/messages/{messageId}/read (PATCH) : 메시지 읽음처리 (원래 false인데 api호출을 통해 해당 id의 메시지의 readflag를 true로 바꿈))
+Parameters : messageId(int)
+message엔티티 필드
+package Myaong.Gangajikimi.chatmessage.entity;
+
+import Myaong.Gangajikimi.chatroom.entity.ChatRoom;
+import Myaong.Gangajikimi.common.BaseEntity;
+import Myaong.Gangajikimi.member.entity.Member;
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Entity
+@Getter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ChatMessage extends BaseEntity {
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "chatroom_id", nullable = false)
+    private ChatRoom chatRoom;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sender_id", nullable = false)
+    private Member sender;
+
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String content;
+
+    private Boolean readFlag;
+
+    public void changeReadFlag(Boolean readFlag) {
+        this.readFlag = readFlag;
+    }
+}
+header:
+Content-Type: application/json
+Authorization: Bearer {Access-Token}
+pathvariable:
+{
+  "messageId": 1
+}
+Responses (코드200) :
+{
+  "isSuccess": true,
+  "code": "COMMON200",
+  "message": "SUCCESS!"
+}
+
+/api/messages/{chatroomId} (GET) : 메시지 조회 (무한스크롤)
+Header:
+Content-Type: application/json
+Authorization: Bearer {Access-Token}
+Parameters : chatroomId(int)
+PathVariable:
+{
+  "chatroomId": 1
+}
+Request(object) :
+{
+  "page": 0,
+  "size": 0
+} 
+Responses (코드200) :
+{
+  "isSuccess": true,
+  "code": "COMMON200",
+  "message": "SUCCESS!",
+  "result": {
+    "messages": [
+      {
+        "messageId": 5,
+        "chatroomId": 3,
+        "senderId": 7,
+        "content": "네 저 잃어버렸어요..",
+        "createdAt": [
+          2025,
+          10,
+          5,
+          20,
+          49,
+          1,
+          509185000
+        ],
+        "read": false
+      },
+      {
+        "messageId": 4,
+        "chatroomId": 3,
+        "senderId": 6,
+        "content": "강아지 잃어버리셨죠?",
+        "createdAt": [
+          2025,
+          10,
+          5,
+          20,
+          48,
+          25,
+          837096000
+        ],
+        "read": false
+      },
+      {
+        "messageId": 3,
+        "chatroomId": 3,
+        "senderId": 7,
+        "content": "안녕하세요 원희님",
+        "createdAt": [
+          2025,
+          10,
+          5,
+          20,
+          47,
+          13,
+          959483000
+        ],
+        "read": false
+      }
+    ],
+    "hasNext": false
+  }
+}
+
+/api/messages/{messageId} (DELETE) : 특정 메시지 삭제
+Parameters : messageId(int)
+Header: 
+Content-Type: application/json
+Authorization: Bearer {Access-Token}
+PathVariable:
+{
+  "messageId": 2
+}
+Responses (코드200) :
+{
+  "isSuccess": true,
+  "code": "COMMON200",
+  "message": "SUCCESS!"
+}
+Responses (코드400) :
+{
+  "isSuccess": false,
+  "code": "MESSAGE401",
+  "message": "본인의 메세지만 삭제할 수 있습니다."
+}
+
+/api/chatrooms (POST) : 채팅방 생성
+HEADER:
+Content-Type: application/json
+Authorization: Bearer {Access-Token}
+
+Request:
+{
+  "memberId": 0, //상대 멤버 아이디
+  "postType": "LOST",
+  "postId": 0
+}
+
+Responses (코드200) :
+{
+  "isSuccess": true,
+  "code": "COMMON200",
+  "message": "SUCCESS!",
+  "result": {
+    "chatroomId": 4,
+    "member1Id": 3,
+    "member2Id": 6,
+    "createdAt": [
+      2025,
+      10,
+      5,
+      20,
+      55,
+      21,
+      840228042
+    ]
+  }
+}
+Responses (코드400):
+{
+  "isSuccess": false,
+  "code": "MEMBER400",
+  "message": "존재하지 않는 회원 ID입니다."
+}
+
+/api/chatrooms/me (GET) : 내 채팅방 목록 조회
+Header:
+Content-Type: application/json
+Authorization: Bearer {Access-Token}
+
+Responses (코드200) :
+{
+  "isSuccess": true,
+  "code": "COMMON200",
+  "message": "SUCCESS!",
+  "result": [
+    {
+      "chatroomId": 3,
+      "partnerId": 7,
+      "partnerNickname": "lee4",
+      "lastMessage": "네 저 잃어버렸어요..",
+      "lastMessageTime": [
+        2025,
+        10,
+        5,
+        20,
+        49,
+        1,
+        509185000
+      ],
+      "unreadCount": 2,
+      "postId": 16,
+      "postType": "LOST",
+      "postTitle": "강아지를 잃어버렸습니다",
+      "postImageUrl": null
+    }
+  ]
+}

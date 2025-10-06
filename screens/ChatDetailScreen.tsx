@@ -1,17 +1,16 @@
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import * as ImagePicker from 'expo-image-picker';
-import React, { useContext, useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { AuthContext } from '../App';
 import BackIcon from '../assets/images/back.svg';
 import ChatHeaderCard from '../components/ChatHeaderCard';
-import { getMapComponents } from '../components/MapComponents';
-import { getMyPosts, getPostById, getChatRoomById } from '../service/mockApi';
-import { MockStompClient, MockMessage } from '../service/mockStompClient';
-import { ChatRoom, Message, Post, RootStackParamList, StackNavigation } from '../types';
-import { formatDisplayDate } from '../utils/time';
+import { getMessages, getPostById, markMessageAsRead } from '../service/mockApi'; // 실제 api 경로로 가정
+import { getStompClient } from '../service/stompClient';
+import { ApiMessage, ChatMessage, ChatRoomFromApi, Post, RootStackParamList, StackNavigation } from '../types';
 import { mapStatusToKorean } from '../utils/format';
+import { formatDisplayDate, formatTime } from '../utils/time';
 
 type ChatDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ChatDetail'>;
 
@@ -20,176 +19,252 @@ const ChatDetailScreen = () => {
   const navigation = useNavigation<StackNavigation>();
   const authContext = useContext(AuthContext);
 
-  const { isLoggedIn, userProfile, userMemberName } = authContext || {};
-  const currentUserId = userMemberName;
+  const { isLoggedIn, userProfile } = authContext;
+  const currentUserId = userProfile?.memberId;
 
   const flatListRef = useRef<FlatList>(null);
-  const clientRef = useRef<MockStompClient | null>(null);
+  const clientRef = useRef<Client | null>(null);
   
-  const { postId, chatContext, chatRoomId, type, witnessData } = route.params;
-  
+  const { postId, chatRoomId, type, chatContext } = route.params;
+  const chatRoomInfoFromRoute = route.params as unknown as ChatRoomFromApi;
+
   const [post, setPost] = useState<Post | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
-  const [chatRoom, setChatRoom] = useState<ChatRoom | null>(null);
-  const [showLocationModal, setShowLocationModal] = useState(false);
-  const [newLocation, setNewLocation] = useState<{latitude: number, longitude: number} | null>(null);
-  const [userPosts, setUserPosts] = useState<Post[]>([]);
+  const [chatRoom, setChatRoom] = useState<ChatRoomFromApi | null>(chatRoomInfoFromRoute);
+
+  const [page, setPage] = useState(0);
+  const [hasNext, setHasNext] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const fetchMessages = useCallback(async (pageNum: number) => {
+    if (loading || !hasNext) return;
+    
+    if (pageNum > 0) setLoadingMore(true);
+    else setLoading(true);
+
+    try {
+      const { messages: newMessages, hasNext: newHasNext } = await getMessages(parseInt(chatRoomId), pageNum, 20);
+      
+      console.log(`FETCH: 과거 메시지 ${newMessages.length}개 로드 성공. (페이지 ${pageNum})`);
+
+      // Mark fetched messages as read
+      newMessages.forEach(msg => {
+        if (msg.senderId !== currentUserId && !msg.read) {
+          markMessageAsRead(parseInt(msg.id));
+        }
+      });
+
+      setMessages(prev => {
+        const existingIds = new Set(prev.map(m => m.id));
+        const filteredNewMessages = newMessages.filter(m => !existingIds.has(m.id));
+        return pageNum === 0 ? newMessages : [...prev, ...filteredNewMessages];
+      });
+
+      setHasNext(newHasNext);
+      setPage(pageNum + 1);
+    } catch (error) {
+      console.error("메시지 로딩 실패:", error);
+      Alert.alert("오류", "메시지를 불러오는 데 실패했습니다.");
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [chatRoomId, loading, hasNext]);
 
   useEffect(() => {
-    if (!isLoggedIn || !currentUserId) {
+    if (!userProfile) {
+      return;
+    }
+
+    if (!isLoggedIn) {
       Alert.alert('로그인 필요', '채팅을 이용하려면 로그인해야 합니다.');
       navigation.goBack();
       return;
     }
 
-    // witnessData가 있으면 목격 카드를 첫 메시지로 추가
-    if (witnessData) {
-      const witnessMessage: Message = {
-        id: `witness_${Date.now()}`,
-        type: 'witness_report',
-        senderMemberName: currentUserId, // 제보자는 현재 사용자
-        time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-        witnessData: {
-          ...witnessData,
-          images: [], // TODO: 이미지 추가 필요
-        },
-      };
-      setMessages([witnessMessage]);
-    }
-
     const fetchInitialData = async () => {
-      const fetchedPost = await getPostById(postId, type);
-      setPost(fetchedPost || null);
-      
-      const fetchedChatRoom = await getChatRoomById(chatRoomId);
-      setChatRoom(fetchedChatRoom || null);
-
-      if (currentUserId) {
-        const { posts: fetchedUserPosts } = await getMyPosts('lost');
-        setUserPosts(fetchedUserPosts || []);
+      try {
+        const fetchedPost = await getPostById(postId, type);
+        setPost(fetchedPost || null);
+        await fetchMessages(0);
+      } catch (error) {
+        console.error("초기 데이터 로딩 실패:", error);
       }
     };
+
     fetchInitialData();
-  }, [postId, chatRoomId, type, isLoggedIn, currentUserId, navigation, witnessData]);
+  }, [postId, type, isLoggedIn, userProfile, navigation]);
 
-  // --- 웹소켓 로직 ---
-  useEffect(() => {
-    if (!chatRoomId || !currentUserId) return;
+  // =========================================================================
+  // ⭐ 핵심 변경 지점: `deactivateClient` 호출을 `unsubscribe`로 변경 ⭐
+  // =========================================================================
+  useFocusEffect(
+    useCallback(() => {
+      if (!chatRoomId || !currentUserId) {
+        console.log('STOMP: chatRoomId 또는 currentUserId가 없어 구독을 시작할 수 없습니다.');
+        return;
+      }
 
-    const client = new MockStompClient();
-    clientRef.current = client;
+      const client = getStompClient();
+      clientRef.current = client;
 
-    client.onConnect = () => {
-      client.subscribe(`/sub/chatroom/${chatRoomId}`, (message) => {
-        const incomingMessage: MockMessage = JSON.parse(message.body);
+      if (!client.active) {
+        console.log('STOMP: 클라이언트가 비활성 상태이므로 활성화를 시도합니다.');
+        client.activate();
+      }
 
-        const formattedMessage: Message = {
-          id: incomingMessage.messageId.toString(),
-          text: incomingMessage.content,
-          time: new Date(incomingMessage.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-          senderMemberName: incomingMessage.senderId === 1 ? (currentUserId || '나') : '상대방',
-          type: 'text',
+      let subscription: StompSubscription | null = null;
+
+      const subscribeToRoom = () => {
+        console.log(`STOMP: 연결됨. /sub/chatroom/${chatRoomId} 구독을 시도합니다.`);
+        if (subscription) { // 혹시 모를 중복 구독 방지
+            subscription.unsubscribe();
+        }
+        subscription = client.subscribe(`/sub/chatroom/${chatRoomId}`, (message: IMessage) => {
+          console.log('STOMP: 새 메시지 수신:', message.body);
+          const incomingMessage: ApiMessage = JSON.parse(message.body);
+
+          const parseApiDateTime = (timeArray?: number[]): string => {
+            if (!timeArray || timeArray.length < 6) return new Date().toISOString();
+            return new Date(timeArray[0], timeArray[1] - 1, timeArray[2], timeArray[3], timeArray[4], timeArray[5]).toISOString();
+          };
+
+          const formattedMessage: ChatMessage = {
+            id: incomingMessage.messageId.toString(),
+            text: incomingMessage.content,
+            senderId: incomingMessage.senderId,
+            time: parseApiDateTime(incomingMessage.createdAt),
+            read: incomingMessage.read,
+            type: 'text',
+          };
+
+          setMessages(prevMessages => {
+            const existingIds = new Set(prevMessages.map(m => m.id));
+            if (existingIds.has(formattedMessage.id)) {
+                return prevMessages;
+            }
+            if (formattedMessage.senderId === currentUserId) {
+                const content = formattedMessage.text;
+                const tempIndex = prevMessages.findIndex(m => m.text === content && m.senderId === currentUserId && m.id.startsWith('temp_'));
+                if (tempIndex !== -1) {
+                    const newMessages = [...prevMessages];
+                    newMessages.splice(tempIndex, 1, formattedMessage);
+                    return newMessages;
+                }
+            }
+            return [formattedMessage, ...prevMessages];
+          });
+
+          if (incomingMessage.senderId !== currentUserId) {
+            markMessageAsRead(incomingMessage.messageId);
+          }
+        });
+        console.log(`STOMP: /sub/chatroom/${chatRoomId} 구독 완료.`);
+      };
+
+      if (client.connected) {
+        subscribeToRoom();
+      } else {
+        const originalOnConnect = client.onConnect;
+        client.onConnect = (frame) => {
+          originalOnConnect?.(frame);
+          subscribeToRoom();
+          client.onConnect = originalOnConnect;
         };
+        console.log('STOMP: 클라이언트가 아직 연결되지 않음. onConnect 콜백에 구독 로직 설정.');
+      }
 
-        setMessages(prevMessages => [...prevMessages, formattedMessage]);
-      });
-    };
+      return () => {
+        if (subscription) {
+          console.log(`STOMP: ChatRoom ${chatRoomId} 포커스 해제. 구독을 해지합니다.`);
+          subscription.unsubscribe();
+        }
+        // deactivateClient() 호출을 제거하여 데이터 유실 버그를 해결합니다.
+      };
+    }, [chatRoomId, currentUserId])
+  );
+  // =========================================================================
+  // ⭐ 핵심 변경 지점 끝 ⭐
+  // =========================================================================
 
-    client.activate();
-
-    return () => {
-      client.deactivate();
-    };
-  }, [chatRoomId, currentUserId]);
-
-
-  const handleSendMessage = async () => {
-    if (inputText.trim() === '' || !clientRef.current) return;
+  const handleSendMessage = () => {
+    const messageContent = inputText.trim();
+    if (messageContent === '') {
+      Alert.alert("경고", "메시지를 입력해 주세요.");
+      return;
+    }
+    
+    let client = clientRef.current;
+    
+    if (!client || !client.connected) {
+        console.error("SEND: 클라이언트 연결 상태가 아닙니다. 재활성화 시도.");
+        client = getStompClient(); 
+        clientRef.current = client;
+        
+        if (!client.active) {
+            client.activate();
+        }
+        
+        Alert.alert("연결 중", "채팅 서버에 연결 중입니다. 잠시 후 다시 메시지를 보내주세요.");
+        return; 
+    }
   
     const messageToSend = {
       type: "MESSAGE",
-      chatroomId: chatRoomId,
-      content: inputText.trim(),
+      chatroomId: parseInt(chatRoomId),
+      content: messageContent,
     };
+    
+    console.log("SEND: 메시지 전송 시도:", messageToSend);
 
-    clientRef.current.publish({ 
-      destination: '/pub/chat', 
-      body: JSON.stringify(messageToSend) 
-    });
+    try {
+        client.publish({ 
+            destination: '/pub/chat', 
+            body: JSON.stringify(messageToSend) 
+        });
+        console.log("SEND: 메시지 전송 요청 성공.");
+        
+        const tempMessage: ChatMessage = {
+            id: `temp_${Date.now()}`, 
+            text: messageContent,
+            senderId: currentUserId!, 
+            time: new Date().toISOString(),
+            read: false,
+            type: 'text',
+        };
+
+        setMessages(prevMessages => [tempMessage, ...prevMessages]);
+        
+    } catch (error) {
+        console.error("SEND: 메시지 publish 중 에러 발생:", error);
+        Alert.alert("전송 오류", "메시지 전송 중 오류가 발생했습니다.");
+    }
 
     setInputText('');
   };
 
-  const handleImagePick = async () => {
-    Alert.alert('알림', '이미지 전송은 현재 지원되지 않습니다.');
-  };
-
-  const handleLocationUpdate = async () => {
-    if (!newLocation || !post) return;
-
-    try {
-      console.log('위치 업데이트:', {
-        postId: post.id,
-        newLocation: newLocation,
-      });
-      
-      Alert.alert(
-        '위치 업데이트 완료',
-        '게시물의 위치 정보가 업데이트되었습니다.',
-        [{ text: '확인', onPress: () => setShowLocationModal(false) }]
-      );
-    } catch (error) {
-      console.error('위치 업데이트 실패:', error);
-      Alert.alert('오류', '위치 업데이트에 실패했습니다.');
-    }
-  };
-
-
-  const renderMessage = ({ item }: { item: Message }) => {
-    const isMyMessage = item.senderMemberName === currentUserId;
-
-    if (item.type === 'witness_report') {
-      return (
-        <View style={styles.witnessReportContainer}>
-          <View style={styles.witnessReportCard}>
-            <View style={styles.witnessReportHeader}>
-              <Text style={styles.witnessReportTitle}>📍 발견 제보</Text>
-              <Text style={styles.witnessReportTime}>{item.time}</Text>
-            </View>
-            {item.witnessData && (
-              <View style={styles.witnessReportContent}>
-                <View style={styles.witnessReportItem}>
-                  <Text style={styles.witnessReportLabel}>위치:</Text>
-                  <Text style={styles.witnessReportValue}>{item.witnessData.location}</Text>
-                </View>
-                <View style={styles.witnessReportItem}>
-                  <Text style={styles.witnessReportLabel}>시간:</Text>
-                  <Text style={styles.witnessReportValue}>{`${(item.witnessData as any).date} ${(item.witnessData as any).time}`}</Text>
-                </View>
-                {item.witnessData.images && item.witnessData.images.length > 0 && (
-                  <View style={styles.witnessReportImages}>
-                    {item.witnessData.images.map((image, index) => (
-                      <Image key={index} source={{ uri: image }} style={styles.witnessReportImage} />
-                    ))}
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-        </View>
-      );
-    }
+  const renderMessage = ({ item }: { item: ChatMessage }) => {
+    const isMyMessage = item.senderId === currentUserId;
+    const isUnread = isMyMessage && !item.read; 
 
     return (
-      <View style={[styles.messageBubble, isMyMessage ? styles.myBubble : styles.otherBubble]}>
-        {item.type === 'text' && (
+      <View style={[styles.messageContainer, isMyMessage ? styles.myMessageContainer : styles.otherMessageContainer]}>
+        {isMyMessage && (
+          <View style={styles.statusGroup}>
+            {isUnread && <Text style={styles.unreadIndicator}>1</Text>}
+            <Text style={styles.statusTime}>{formatTime(item.time)}</Text>
+          </View>
+        )}
+        <View style={[styles.messageBubble, isMyMessage ? styles.myBubble : styles.otherBubble]}>
           <Text style={styles.messageText}>{item.text}</Text>
+        </View>
+        {!isMyMessage && (
+          <View style={styles.statusGroup}>
+            <Text style={styles.statusTime}>{formatTime(item.time)}</Text>
+          </View>
         )}
-        {item.type === 'image' && item.imageUrl && (
-          <Image source={{ uri: item.imageUrl }} style={styles.chatImage} />
-        )}
-        <Text style={styles.messageTime}>{item.time}</Text>
       </View>
     );
   };
@@ -197,33 +272,12 @@ const ChatDetailScreen = () => {
   if (!post || !chatRoom) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <Text style={styles.loadingText}>게시물 정보를 불러오는 중...</Text>
+        <ActivityIndicator size="large" style={{ marginTop: 50 }} />
       </SafeAreaView>
     );
   }
 
-  const otherParticipantId = chatRoom.participants.find(id => id !== currentUserId);
-  const otherUserName = otherParticipantId || '상대방';
-
-  const isAuthor = post.userMemberName === currentUserId;
-  let showChatHeaderCard = false;
-  let showLocationUploadButton = false;
-
-  if (chatContext === 'match') {
-    showChatHeaderCard = true;
-    const hasMyLostPost = userPosts?.some(p => p.type === 'lost');
-    if (hasMyLostPost) {
-      showLocationUploadButton = true;
-    }
-  } else if (chatContext === 'witnessedPostReport') {
-    if (!isAuthor) {
-      showChatHeaderCard = true;
-    }
-  } else if (chatContext === 'lostPostReport') {
-    if (isAuthor) {
-      showLocationUploadButton = true;
-    }
-  }
+  const otherUserName = chatRoom.partnerNickname || '상대방';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -235,41 +289,24 @@ const ChatDetailScreen = () => {
           <Text style={styles.headerTitle}>{otherUserName}</Text>
         </View>
 
-        {showChatHeaderCard && (
-          <ChatHeaderCard
-            title={post.title}
-            species={post.species}
-            color={post.color}
-            location={post.location}
-            date={formatDisplayDate(post.date)}
-            status={mapStatusToKorean(post.status)}
-            photos={post.photos}
-            chatContext={chatContext}
-            onPress={() => {
-              console.log('게시글 상세 페이지로 이동:', post.id);
-              navigation.navigate('PostDetail', { id: post.id, type: post.type });
-            }}
-          />
-        )}
-        
-        {showLocationUploadButton && (
-          <View style={styles.locationUploadContainer}>
-            <TouchableOpacity 
-              style={styles.locationUploadButton}
-              onPress={() => setShowLocationModal(true)}
-            >
-              <Text style={styles.locationUploadButtonText}>
-                📍 위치 정보 업로드
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
+        <ChatHeaderCard
+          title={post.title}
+          species={post.species}
+          color={post.color}
+          location={post.location}
+          date={formatDisplayDate(post.date)}
+          status={mapStatusToKorean(post.status)}
+          photos={post.photos}
+          chatContext={chatContext}
+          onPress={() => {
+            navigation.navigate('PostDetail', { id: post.id, type: post.type });
+          }}
+        />
       </View>
       <KeyboardAvoidingView 
         style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <FlatList
           ref={flatListRef}
@@ -278,10 +315,13 @@ const ChatDetailScreen = () => {
           keyExtractor={(item) => item.id} 
           style={styles.chatList}
           contentContainerStyle={styles.chatListContent}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          inverted
+          onEndReached={() => fetchMessages(page)}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={loadingMore ? <ActivityIndicator style={{ marginVertical: 20 }} /> : null}
         />
         <View style={styles.inputContainer}>
-          <TouchableOpacity style={styles.inputButton} onPress={handleImagePick}> 
+          <TouchableOpacity style={styles.inputButton} onPress={() => Alert.alert('알림', '이미지 전송은 현재 지원되지 않습니다.')}> 
             <Text style={styles.inputButtonText}>+</Text>
           </TouchableOpacity>
           <TextInput
@@ -291,112 +331,25 @@ const ChatDetailScreen = () => {
             value={inputText}
             onChangeText={setInputText}
           />
-          <TouchableOpacity style={[styles.inputButton, styles.sendButton]} onPress={handleSendMessage}>
+          <TouchableOpacity 
+            style={[styles.inputButton, styles.sendButton]} 
+            onPress={handleSendMessage}
+          >
             <BackIcon width={24} height={24} color="#888" style={styles.sendIcon} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-
-      <Modal
-        visible={showLocationModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowLocationModal(false)}
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity 
-              style={styles.modalCloseButton}
-              onPress={() => setShowLocationModal(false)}
-            >
-              <Text style={styles.modalCloseButtonText}>취소</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>위치 정보 업로드</Text>
-            <TouchableOpacity 
-              style={styles.modalSaveButton}
-              onPress={handleLocationUpdate}
-              disabled={!newLocation}
-            >
-              <Text style={[styles.modalSaveButtonText, !newLocation && styles.modalSaveButtonTextDisabled]}>
-                저장
-              </Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.mapContainer}>
-            {(() => {
-              const { MapView: MapViewComponent, Marker: MarkerComponent } = getMapComponents();
-              
-              if (MapViewComponent && MarkerComponent) {
-                return (
-                  <MapViewComponent
-                    style={styles.map}
-                    initialRegion={{
-                      latitude: post?.latitude || 37.5665,
-                      longitude: post?.longitude || 126.9780,
-                      latitudeDelta: 0.01,
-                      longitudeDelta: 0.01,
-                    }}
-                    onPress={(event: any) => {
-                      const { latitude, longitude } = event.nativeEvent.coordinate;
-                      setNewLocation({ latitude, longitude });
-                    }}
-                  >
-                    {post && (
-                      <MarkerComponent
-                        coordinate={{
-                          latitude: post.latitude,
-                          longitude: post.longitude,
-                        }}
-                        title="기존 위치"
-                        description={post.location}
-                        pinColor="red"
-                      />
-                    )}
-                    
-                    {newLocation && (
-                      <MarkerComponent
-                        coordinate={newLocation}
-                        title="새로운 위치"
-                        description="업데이트할 위치"
-                        pinColor="blue"
-                      />
-                    )}
-                  </MapViewComponent>
-                );
-              }
-              
-              return (
-                <View style={[styles.map, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-                  <Text>지도는 모바일에서만 지원됩니다</Text>
-                </View>
-              );
-            })()}
-          </View>
-          
-          <View style={styles.modalFooter}>
-            <Text style={styles.modalDescription}>
-              지도를 터치하여 새로운 위치를 선택하세요.{"\n"} 
-              빨간 핀: 기존 위치, 파란 핀: 새로운 위치
-            </Text>
-          </View>
-        </SafeAreaView>
-      </Modal>
     </SafeAreaView>
   );
 };
 
+// 보내주신 스타일 코드를 그대로 사용합니다.
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#fff',
   },
-  loadingText: {
-    textAlign: 'center',
-    marginTop: 50,
-  },
   headerContainer: {
-    paddingBottom: 0,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
@@ -405,6 +358,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
+    position: 'relative',
   },
   headerTitle: {
     fontSize: 18,
@@ -412,9 +366,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 15,
     left: 10,
-    zIndex: 10,
     padding: 10,
   },
   container: {
@@ -426,32 +378,51 @@ const styles = StyleSheet.create({
   },
   chatListContent: {
     paddingVertical: 10,
+    justifyContent: 'flex-end',
+  },
+  messageContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginBottom: 8,
+  },
+  myMessageContainer: {
+    alignSelf: 'flex-end',
+  },
+  otherMessageContainer: {
+    alignSelf: 'flex-start',
   },
   messageBubble: {
     maxWidth: '80%',
     padding: 10,
     borderRadius: 15,
-    marginBottom: 8,
   },
   myBubble: {
     backgroundColor: '#FDD7E4',
-    alignSelf: 'flex-end',
     borderTopRightRadius: 0,
   },
   otherBubble: {
     backgroundColor: '#E9ECEF',
-    alignSelf: 'flex-start',
     borderTopLeftRadius: 0,
   },
   messageText: {
     fontSize: 14,
     color: '#333',
   },
-  messageTime: {
+  statusGroup: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 5,
+  },
+  statusTime: {
     fontSize: 10,
     color: '#888',
-    alignSelf: 'flex-end',
-    marginTop: 4,
+  },
+  unreadIndicator: {
+    fontSize: 12, 
+    color: '#888',
+    fontWeight: 'bold',
+    marginBottom: 2,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -460,6 +431,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
+    backgroundColor: '#fff',
   },
   inputButton: {
     width: 40,
@@ -486,173 +458,6 @@ const styles = StyleSheet.create({
   },
   sendIcon: {
     transform: [{ rotate: '180deg' }],
-  },
-  chatImage: {
-    width: 200,
-    height: 200,
-    borderRadius: 10,
-    resizeMode: 'cover',
-  },
-  locationUploadContainer: {
-    backgroundColor: '#f8f9fa',
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  locationUploadButton: {
-    padding: 12,
-    alignItems: 'center',
-  },
-  locationUploadButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  locationUploadForm: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
-  },
-  locationUploadTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  locationUploadDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  confirmLocationButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  confirmLocationButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  modalCloseButton: {
-    padding: 8,
-  },
-  modalCloseButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  modalSaveButton: {
-    padding: 8,
-  },
-  modalSaveButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  modalSaveButtonTextDisabled: {
-    color: '#ccc',
-  },
-  mapContainer: {
-    flex: 1,
-  },
-  map: {
-    flex: 1,
-  },
-  modalFooter: {
-    padding: 16,
-    backgroundColor: '#f8f9fa',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  modalDescription: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  witnessReportContainer: {
-    marginVertical: 8,
-    marginHorizontal: 16,
-  },
-  witnessReportCard: {
-    backgroundColor: '#fff3cd',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#ffeaa7',
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  witnessReportHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  witnessReportTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#856404',
-  },
-  witnessReportTime: {
-    fontSize: 12,
-    color: '#856404',
-  },
-  witnessReportContent: {
-    gap: 8,
-  },
-  witnessReportItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  witnessReportLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#856404',
-    width: 50,
-  },
-  witnessReportValue: {
-    fontSize: 14,
-    color: '#856404',
-    flex: 1,
-    marginLeft: 8,
-  },
-  witnessReportImages: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
-  },
-  witnessReportImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
   },
 });
 

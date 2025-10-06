@@ -12,6 +12,13 @@ export type RootTabParamList = {
   MyPage: undefined;
 };
 
+// ChatDetail 스크린으로 전달될 파라미터 타입 정의
+export type ChatDetailParams = ChatRoomFromApi & {
+  chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
+  witnessData?: Message['witnessData'];
+  type: 'lost' | 'witnessed'; // postType과 중복될 수 있으나, PostDetail 등에서 사용되므로 유지
+};
+
 export type RootStackParamList = {
   RootTab: NavigatorScreenParams<RootTabParamList>;
   PostDetail: { 
@@ -23,13 +30,7 @@ export type RootStackParamList = {
     editMode?: boolean;
     postId?: string;
   };
-  ChatDetail: { 
-    postId: string; 
-    chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
-    chatRoomId: string;
-    type: 'lost' | 'witnessed';
-    witnessData?: Message['witnessData']; // 발견 제보 데이터 추가
-  };
+  ChatDetail: ChatDetailParams;
   NotificationsScreen: undefined;
   Report: {
     postId: string;
@@ -75,8 +76,10 @@ export interface SignUpPayload {
 }
 
 export interface AuthResult {
+  userId: number;
   memberName: string;
   accessToken: string;
+  refreshToken: string;
 }
 
 export interface UserProfile {
@@ -88,8 +91,9 @@ export interface UserProfile {
 export interface AuthContextType {
   isLoggedIn: boolean;
   userMemberName: string | null; // 로그인 시 받는 이름
+  userMemberId: number | null; // App.tsx에서 제공하는 userMemberId 추가
   userProfile: UserProfile | null; // 프로필 조회로 받는 정보
-  signIn: (authResult: AuthResult) => void;
+  signIn: (authResult: AuthResult) => Promise<void>;
   signOut: () => void;
   fetchUserProfile: () => Promise<void>;
 }
@@ -171,6 +175,7 @@ export interface Post {
   latitude?: number;
   longitude?: number;
   userMemberName: string; // from authorName
+  authorId?: number; // from authorId
   uploadedAt: string;     // from createdAt
   timeAgo?: string;
 }
@@ -226,16 +231,6 @@ export interface ChatRoom {
   chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
 }
 
-export interface Message {
-  id: string;
-  text?: string;
-  imageUrl?: string;
-  senderMemberName: string;
-  time: string;
-  type: 'text' | 'image' | 'witness_report';
-  witnessData?: { location: string; time: string; description: string; images: string[] };
-}
-
 export interface Notification {
   id: string;
   type: 'MATCH_FOUND' | 'WITNESS_REPORT' | 'NEW_POST_NEARBY';
@@ -250,4 +245,72 @@ timestamp: string;
 export interface PushNotificationData {
   type: 'MATCH_FOUND' | 'WITNESS_REPORT' | 'NEW_POST_NEARBY';
   postId?: string;
+}
+
+// =========================================================================
+// 채팅 및 메시지 타입
+// =========================================================================
+
+// --- API 응답 타입 (Raw data from backend) ---
+
+// GET /api/chatrooms/me
+export interface ApiChatRoom {
+  chatroomId: number;
+  partnerId: number;
+  partnerNickname: string;
+  lastMessage: string;
+  lastMessageTime: number[];
+  unreadCount: number;
+  postId: number;
+  postType: 'LOST' | 'FOUND';
+  postTitle: string;
+  postImageUrl: string | null;
+}
+
+// GET /api/messages/{chatroomId}
+export interface ApiMessage {
+  messageId: number;
+  chatroomId: number;
+  senderId: number;
+  content: string;
+  createdAt: number[];
+  read: boolean;
+}
+
+// --- 앱 내부에서 사용하는 채팅 및 메시지 타입 ---
+
+// getMyChatRooms가 반환하는 타입
+export interface ChatRoomFromApi {
+  id: string; // chatroomId.toString()
+  chatRoomId: string; // id와 동일 값. ChatDetail 탐색 시 필요.
+  partnerId: number;
+  partnerNickname: string;
+  lastMessage: string;
+  lastMessageTime: string | null; // ISO format or null
+  unreadCount: number;
+  postId: string;
+  postType: 'LOST' | 'FOUND';
+  postTitle: string;
+  postImageUrl: string | null;
+}
+
+// getMessages가 반환하는 타입
+export interface ChatMessage {
+  id: string; // messageId.toString()
+  text: string;
+  senderId: number;
+  time: string; // ISO format
+  read: boolean;
+  type: 'text' | 'image'; // 확장성을 위해 유지
+}
+
+// 기존 Message 타입 (Mock 데이터 및 웹소켓 메시지용으로 유지)
+export interface Message {
+  id: string;
+  text?: string;
+  imageUrl?: string;
+  senderMemberName: string; // 웹소켓은 senderId 대신 senderMemberName을 사용할 수 있음
+  time: string;
+  type: 'text' | 'image' | 'witness_report';
+  witnessData?: { location: string; time: string; description: string; images: string[] };
 }

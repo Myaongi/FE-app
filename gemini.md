@@ -79,7 +79,8 @@
 -   **게시글 목록/상세 API**: 게시글 목록 조회(`LostScreen`), 내 게시글 목록 조회(`MypageScreen`), 게시글 상세 조회(`PostDetail...`) 기능이 모두 연동되었습니다.
 -   **견종 검색 API**: 게시글 작성 시, 견종 이름 자동완성 기능이 연동되었습니다.
 -   **게시글 생성/수정/삭제 API**: 생성, 수정, 삭제 기능이 모두 정상적으로 연동되었습니다.
--   **Mock API**: `MatchScreen`, `ChatScreen` 등 아직 기능이 구현되지 않은 부분에서 Mock 데이터를 사용하고 있습니다.
+-   **채팅 API**: 채팅방 생성, 목록 조회, 메시지 조회, 실시간 메시지 송수신 기능이 모두 연동되었습니다.
+-   **Mock API**: `MatchScreen` 등 아직 기능이 구현되지 않은 부분에서 Mock 데이터를 사용하고 있습니다.
 
 ## 6. 최근 주요 작업
 
@@ -153,4 +154,31 @@
         }
         ```
     -   이 방식을 통해 백엔드는 프론트엔드에서 보낸 `images` 파일들과 `finalImageOrder`를 조합하여 완벽한 최종 순서를 재구성할 수 있습니다.
-    -   **추후 해결 예정, 현재는 기존 existingImageUrls로 기존 파일을 보내고 있음.** 
+    -   **추후 해결 예정, 현재는 기존 existingImageUrls로 기존 파일을 보내고 있음.**
+
+## 10. 채팅 기능 API 연동 (2025-10-05)
+
+-   **상태**: **완료**
+-   **목표**: 기존에 Mock 데이터로 구현되어 있던 채팅 기능을 실제 백엔드 API 및 WebSocket과 연동.
+-   **주요 변경 사항**:
+    -   **API 서비스 수정 (`service/mockApi.ts`)**:
+        -   `getMyChatRooms`: `GET /api/chatrooms/me` API를 호출하여 내 채팅방 목록을 가져오는 기능으로 교체.
+        -   `getMessages`: `GET /api/messages/{chatroomId}` API를 호출하여 특정 채팅방의 메시지 내역을 가져오는 기능 (페이지네이션 포함)을 새로 구현.
+        -   `createChatRoom`: `POST /api/chatrooms` API를 호출하여 채팅방을 생성하는 기능으로 교체.
+        -   `markMessageAsRead`: `PATCH /api/messages/{messageId}/read` API를 호출하여 메시지 읽음 처리를 하는 기능을 새로 구현.
+    -   **타입 정의 (`types.tsx`)**:
+        -   채팅 API 명세에 맞춰 `ApiChatRoom`, `ApiMessage` (API 원본 데이터), `ChatRoomFromApi`, `ChatMessage` (앱 내부용 데이터) 타입을 추가하고 기존 타입을 리팩토링.
+        -   `RootStackParamList`의 `ChatDetail` 파라미터 타입을 `ChatDetailParams`로 정의하여, 화면 간 데이터 전달의 타입 안정성을 강화.
+    -   **채팅 목록 화면 (`screens/ChatScreen.tsx`)**:
+        -   Mock 데이터를 `getMyChatRooms` API 호출로 대체.
+        -   `ChatDetailScreen`으로 이동 시, 필요한 모든 정보를 파라미터로 전달하여 상세 화면에서의 불필요한 API 호출을 최소화.
+    -   **채팅 상세 화면 (`screens/ChatDetailScreen.tsx`)**:
+        -   화면 진입 시 `getMessages`를 호출하여 이전 대화 기록을 로드하고, FlatList의 `inverted` 속성을 활용하여 무한 스크롤(상단으로 스크롤 시 이전 내역 로드)을 구현.
+        -   `stompClient`를 사용하여 WebSocket에 연결하고, 해당 `chatroomId` 토픽을 구독하여 실시간으로 메시지를 수신.
+        -   메시지 전송 버튼 클릭 시 `stompClient`를 통해 메시지를 publish.
+        -   상대방으로부터 메시지를 수신하면 `markMessageAsRead` API를 호출하여 읽음 처리.
+    -   **게시글 상세 화면 (`screens/PostDetailScreen.tsx`)**:
+        -   '채팅하기' 버튼 클릭 시 `createChatRoom` API를 호출하고, 생성된 채팅방 정보(`chatroomId` 등)를 `ChatDetailScreen`에 파라미터로 전달하여 즉시 채팅을 시작할 수 있도록 수정.
+    -   **연속적인 타입 오류 수정**:
+        -   `postId`의 타입(`string` vs `number`) 불일치, `authorId` 필드 누락, `formatTime` 유틸 함수 부재 등 연동 과정에서 발생한 다수의 타입 관련 오류를 순차적으로 해결하여 코드 안정성을 확보.
+-   **결론**: 채팅방 목록 조회, 채팅방 생성, 과거 메시지 조회, 실시간 메시지 송수신 등 핵심 채팅 기능이 모두 실제 API와 연동되었습니다.

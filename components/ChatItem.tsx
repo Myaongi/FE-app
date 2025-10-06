@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { mapLostTypeToKorean } from '../utils/format';
 
 export interface ChatData {
   id: string;
@@ -9,7 +9,7 @@ export interface ChatData {
   time: string;
   title: string;
   lastMessage: string;
-  status: '실종' | '발견' | '귀가 완료';
+  postType: 'LOST' | 'FOUND';
   unreadCount: number; 
 }
 
@@ -19,14 +19,12 @@ export interface ChatItemProps {
 }
 
 const ChatItem = ({ chat, onPress }: ChatItemProps) => {
-  const getStatusStyle = (status: ChatData['status']) => {
-    switch (status) {
-      case '실종':
+  const getStatusStyle = (postType: ChatData['postType']) => {
+    switch (postType) {
+      case 'LOST':
         return styles.lost;
-      case '발견':
+      case 'FOUND':
         return styles.witnessed;
-      case '귀가 완료':
-        return styles.completed;
       default:
         return {};
     }
@@ -48,10 +46,10 @@ const ChatItem = ({ chat, onPress }: ChatItemProps) => {
         <View
           style={[
             styles.statusBadge,
-            getStatusStyle(chat.status),
+            getStatusStyle(chat.postType),
           ]}
         >
-          <Text style={styles.statusText}>{chat.status}</Text>
+          <Text style={styles.statusText}>{mapLostTypeToKorean(chat.postType)}</Text>
         </View>
         {chat.unreadCount > 0 && (
           <View style={styles.unreadBadge}>
