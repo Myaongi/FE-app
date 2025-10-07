@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// ⭐ 1. 타입 에러 해결: 필요한 타입을 axios에서 모두 import 합니다.
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import {
   ApiResponse,
   AuthResult,
   ChatRoom,
+  CreateSightCardResult,
   GeocodeResult,
   LoginPayload,
   Match,
@@ -23,6 +23,8 @@ import {
   ApiChatRoom,
   ChatMessage,
   ApiMessage,
+  SightCardPayload,
+  SightCard,
 } from '../types';
 
 // =========================================================================
@@ -551,10 +553,6 @@ guestApiClient.interceptors.response.use(
 );
 
 export const getPostById = async (id: string, type: 'lost' | 'witnessed'): Promise<Post | undefined> => {
-  if (id === '1') {
-    console.log(`[MOCK] getPostById for ID '1'`);
-    return new Promise(resolve => setTimeout(() => resolve(mockUserPost), 300));
-  }
 
   const endpoint = type === 'lost' ? `/lost-posts/${id}` : `/found-posts/${id}`;
   try {
@@ -771,7 +769,8 @@ export const getMyChatRooms = async (): Promise<ChatRoomFromApi[]> => {
           postId: apiRoom.postId.toString(),
           postType: apiRoom.postType,
           postTitle: apiRoom.postTitle,
-          postImageUrl: apiRoom.postImageUrl,
+          postImageUrl: apiRoom.postImageUrl ? `https://gangajikimi-server.s3.ap-northeast-2.amazonaws.com/${apiRoom.postImageUrl}` : null,
+          postRegion: apiRoom.postRegion, // postRegion 추가
         };
       });
     } else {
@@ -793,7 +792,7 @@ export const getMessages = async (chatroomId: number, page: number = 0, size: nu
       const messages: ChatMessage[] = apiMessages.map(apiMsg => {
         const timeArray = apiMsg.createdAt || [];
         const isoTime = timeArray.length > 5
-          ? new Date(Date.UTC(timeArray[0], timeArray[1] - 1, timeArray[2], timeArray[3], timeArray[4], timeArray[5])).toISOString()
+          ? new Date(timeArray[0], timeArray[1] - 1, timeArray[2], timeArray[3], timeArray[4], timeArray[5]).toISOString()
           : new Date().toISOString();
         
         return {
@@ -848,6 +847,19 @@ export const createChatRoom = async (partnerId: number, postId: number, postType
     }
     console.error('createChatRoom API error:', error);
     throw error;
+  }
+};
+
+export const createSightCard = async (payload: SightCardPayload): Promise<CreateSightCardResult> => {
+  try {
+    const response = await apiClient.post<ApiResponse<CreateSightCardResult>>('/sight-cards', payload);
+    if (response.data.isSuccess) {
+      return response.data.result;
+    } else {
+      throw new Error(response.data.message || '목격 카드를 생성하는 데 실패했습니다.');
+    }
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || '목격 카드를 생성하는 중 오류가 발생했습니다.');
   }
 };
 
@@ -926,4 +938,22 @@ export const sendWitnessReport = async (roomId: string, witnessData: any, sender
     room.lastMessageTime = newMessage.time;
   }
   return new Promise(resolve => setTimeout(() => resolve(newMessage), 300));
+};
+
+export const getSightCardByChatRoomId = async (chatRoomId: string): Promise<SightCard | null> => {
+  try {
+    const response = await apiClient.get<ApiResponse<SightCard>>(`/sight-cards/${chatRoomId}`);
+    if (response.data && response.data.isSuccess) {
+      return response.data.result;
+    } else {
+      if (response.data.code === 'SIGHTCARD4001') {
+        console.log(`No sight card found for chatroom ${chatRoomId}`);
+        return null;
+      }
+      throw new Error(response.data.message || '발견 카드를 불러오는 데 실패했습니다.');
+    }
+  } catch (error) {
+    console.error('getSightCardByChatRoomId API error:', error);
+    return null;
+  }
 };

@@ -1,53 +1,24 @@
 import { useFocusEffect, useNavigation, type NavigationProp } from '@react-navigation/native';
-import React, { useContext, useState } from 'react';
+import React from 'react';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, View, Text, ActivityIndicator } from 'react-native';
-import { AuthContext } from '../App';
 import AppHeader from '../components/AppHeader';
 import ChatItem, { ChatData } from '../components/ChatItem';
-import { getMyChatRooms } from '../service/mockApi';
+import { useBadge } from '../contexts/BadgeContext';
+import { useAuth } from '../hooks/useAuth';
 import { RootStackParamList, ChatRoomFromApi } from '../types';
 import { formatRelativeTime } from '../utils/time';
 
 const ChatScreen = () => {
-  const [chatList, setChatList] = useState<ChatRoomFromApi[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const authContext = useContext(AuthContext); 
-  const { isLoggedIn } = authContext;
-
-  const loadChats = async () => {
-    if (!isLoggedIn) {
-      setChatList([]);
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const rooms = await getMyChatRooms();
-      
-      // Sort rooms by lastMessageTime, most recent first
-      rooms.sort((a, b) => {
-        if (!a.lastMessageTime && !b.lastMessageTime) return 0;
-        if (!a.lastMessageTime) return 1;
-        if (!b.lastMessageTime) return -1;
-        return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
-      });
-
-      setChatList(rooms);
-    } catch (error) {
-      console.error('채팅 목록을 불러오는 중 오류 발생:', error);
-      Alert.alert('오류', '채팅 목록을 불러올 수 없습니다.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { isLoggedIn } = useAuth();
+  const { chatList, isLoading, fetchChatData } = useBadge();
 
   useFocusEffect(
     React.useCallback(() => {
-      loadChats();
-    }, [isLoggedIn])
+      if (isLoggedIn) {
+        fetchChatData();
+      }
+    }, [isLoggedIn, fetchChatData])
   );
   
   const handlePressChat = (chatItem: ChatRoomFromApi) => {
@@ -56,12 +27,14 @@ const ChatScreen = () => {
       return;
     }
 
+    const chatContext = chatItem.postType === 'LOST' ? 'lostPostReport' : 'witnessedPostReport';
+
     navigation.navigate('ChatDetail', {
       ...chatItem,
       chatRoomId: chatItem.id,
       postId: chatItem.postId.toString(),
       type: chatItem.postType === 'LOST' ? 'lost' : 'witnessed',
-      chatContext: 'lostPostReport', 
+      chatContext: chatContext, 
     });
   };
 
@@ -80,12 +53,13 @@ const ChatScreen = () => {
     const transformedChatList: ChatData[] = chatList.map(chat => ({
       id: chat.id,
       name: chat.partnerNickname,
-      location: '위치 정보 없음', // API에 해당 정보가 없으므로 임시값 사용
+      postRegion: chat.postRegion,
       time: chat.lastMessageTime ? formatRelativeTime(chat.lastMessageTime) : '',
       title: chat.postTitle,
       lastMessage: chat.lastMessage,
-      postType: chat.postType, // Correctly map postType
+      postType: chat.postType,
       unreadCount: chat.unreadCount,
+      postImageUrl: chat.postImageUrl,
     }));
 
     return (

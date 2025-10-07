@@ -1,14 +1,15 @@
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
-import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { AuthContext } from '../App';
+import { useAuth } from '../hooks/useAuth'; // useAuth 훅으로 변경
 import BackIcon from '../assets/images/back.svg';
 import ChatHeaderCard from '../components/ChatHeaderCard';
-import { getMessages, getPostById, markMessageAsRead } from '../service/mockApi'; // 실제 api 경로로 가정
+import SightCardComponent from '../components/SightCard';
+import { getMessages, getPostById, getSightCardByChatRoomId, markMessageAsRead } from '../service/mockApi';
 import { getStompClient } from '../service/stompClient';
-import { ApiMessage, ChatMessage, ChatRoomFromApi, Post, RootStackParamList, StackNavigation } from '../types';
+import { ApiMessage, ChatMessage, ChatRoomFromApi, Post, RootStackParamList, SightCard, StackNavigation } from '../types';
 import { mapStatusToKorean } from '../utils/format';
 import { formatDisplayDate, formatTime } from '../utils/time';
 
@@ -17,10 +18,10 @@ type ChatDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ChatDet
 const ChatDetailScreen = () => {
   const route = useRoute<ChatDetailScreenProps['route']>();
   const navigation = useNavigation<StackNavigation>();
-  const authContext = useContext(AuthContext);
+  const { isLoggedIn, userProfile } = useAuth(); // useAuth 훅 사용
 
-  const { isLoggedIn, userProfile } = authContext;
   const currentUserId = userProfile?.memberId;
+  console.log('현재 로그인된 유저 ID (currentUserId):', currentUserId);
 
   const flatListRef = useRef<FlatList>(null);
   const clientRef = useRef<Client | null>(null);
@@ -32,6 +33,7 @@ const ChatDetailScreen = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [chatRoom, setChatRoom] = useState<ChatRoomFromApi | null>(chatRoomInfoFromRoute);
+  const [fetchedSightCard, setFetchedSightCard] = useState<SightCard | null>(null);
 
   const [page, setPage] = useState(0);
   const [hasNext, setHasNext] = useState(true);
@@ -50,6 +52,7 @@ const ChatDetailScreen = () => {
       console.log(`FETCH: 과거 메시지 ${newMessages.length}개 로드 성공. (페이지 ${pageNum})`);
 
       newMessages.forEach(msg => {
+        console.log('과거 메시지 senderId:', msg.senderId);
         if (msg.senderId !== currentUserId && !msg.read) {
           markMessageAsRead(parseInt(msg.id));
         }
@@ -70,7 +73,7 @@ const ChatDetailScreen = () => {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [chatRoomId, loading, hasNext]);
+  }, [chatRoomId, loading, hasNext, currentUserId]);
 
   useEffect(() => {
     if (!userProfile) {
@@ -88,13 +91,18 @@ const ChatDetailScreen = () => {
         const fetchedPost = await getPostById(postId, type);
         setPost(fetchedPost || null);
         await fetchMessages(0);
+
+        if (chatContext === 'lostPostReport') {
+          const sightCardData = await getSightCardByChatRoomId(chatRoomId);
+          setFetchedSightCard(sightCardData);
+        }
       } catch (error) {
         console.error("초기 데이터 로딩 실패:", error);
       }
     };
 
     fetchInitialData();
-  }, [postId, type, isLoggedIn, userProfile, navigation]);
+  }, [postId, type, isLoggedIn, userProfile, navigation, fetchMessages, chatContext, chatRoomId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -115,12 +123,13 @@ const ChatDetailScreen = () => {
 
       const subscribeToRoom = () => {
         console.log(`STOMP: 연결됨. /sub/chatroom/${chatRoomId} 구독을 시도합니다.`);
-        if (subscription) { // 혹시 모를 중복 구독 방지
+        if (subscription) {
             subscription.unsubscribe();
         }
         subscription = client.subscribe(`/sub/chatroom/${chatRoomId}`, (message: IMessage) => {
           console.log('STOMP: 새 메시지 수신:', message.body);
           const incomingMessage: ApiMessage = JSON.parse(message.body);
+          console.log('웹소켓으로 받은 메시지 senderId:', incomingMessage.senderId);
 
           const parseApiDateTime = (timeArray?: number[]): string => {
             if (!timeArray || timeArray.length < 6) return new Date().toISOString();
@@ -177,7 +186,6 @@ const ChatDetailScreen = () => {
           console.log(`STOMP: ChatRoom ${chatRoomId} 포커스 해제. 구독을 해지합니다.`);
           subscription.unsubscribe();
         }
-        // deactivateClient() 호출을 제거하여 데이터 유실 버그를 해결합니다.
       };
     }, [chatRoomId, currentUserId])
   );
@@ -220,9 +228,9 @@ const ChatDetailScreen = () => {
         console.log("SEND: 메시지 전송 요청 성공.");
         
         const tempMessage: ChatMessage = {
-            id: `temp_${Date.now()}`, 
+            id: `temp_${Date.now()}`,
             text: messageContent,
-            senderId: currentUserId!, 
+            senderId: currentUserId!,
             time: new Date().toISOString(),
             read: false,
             type: 'text',
@@ -238,9 +246,14 @@ const ChatDetailScreen = () => {
     setInputText('');
   };
 
+  const handleUpdateLocation = () => {
+    // TODO: 백엔드 API가 준비되면 위치 정보 업데이트 로직을 구현합니다.
+    Alert.alert("알림", "위치 정보 업데이트 기능은 아직 준비 중입니다.");
+  };
+
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isMyMessage = item.senderId === currentUserId;
-    const isUnread = isMyMessage && !item.read; 
+    const isUnread = isMyMessage && !item.read;
 
     return (
       <View style={[styles.messageContainer, isMyMessage ? styles.myMessageContainer : styles.otherMessageContainer]}>
@@ -271,6 +284,9 @@ const ChatDetailScreen = () => {
   }
 
   const otherUserName = chatRoom.partnerNickname || '상대방';
+  const isMyPost = post?.authorId === currentUserId;
+  
+  const isWitnessedReportByAuthor = chatContext === 'witnessedPostReport' && isMyPost;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -291,9 +307,14 @@ const ChatDetailScreen = () => {
           status={mapStatusToKorean(post.status)}
           photos={post.photos}
           chatContext={chatContext}
+          isMyPost={isMyPost}
+          showDetails={!isWitnessedReportByAuthor}
           onPress={() => {
-            navigation.navigate('PostDetail', { id: post.id, type: post.type });
+            if (!isWitnessedReportByAuthor) {
+              navigation.navigate('PostDetail', { id: post.id, type: post.type });
+            }
           }}
+          onUpdateLocation={handleUpdateLocation}
         />
       </View>
       <KeyboardAvoidingView 
@@ -301,11 +322,18 @@ const ChatDetailScreen = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
+        {fetchedSightCard && (
+          <SightCardComponent 
+            sightCard={fetchedSightCard} 
+            isMyPost={isMyPost}
+            onUpdateLocation={handleUpdateLocation} 
+          />
+        )}
         <FlatList
           ref={flatListRef}
           data={messages}
           renderItem={renderMessage}
-          keyExtractor={(item) => item.id} 
+          keyExtractor={(item) => item.id}
           style={styles.chatList}
           contentContainerStyle={styles.chatListContent}
           inverted
@@ -314,9 +342,6 @@ const ChatDetailScreen = () => {
           ListFooterComponent={loadingMore ? <ActivityIndicator style={{ marginVertical: 20 }} /> : null}
         />
         <View style={styles.inputContainer}>
-          <TouchableOpacity style={styles.inputButton} onPress={() => Alert.alert('알림', '이미지 전송은 현재 지원되지 않습니다.')}> 
-            <Text style={styles.inputButtonText}>+</Text>
-          </TouchableOpacity>
           <TextInput
             style={styles.input}
             placeholder="메시지를 입력하세요."
@@ -444,7 +469,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     borderRadius: 20,
     paddingHorizontal: 15,
-    marginHorizontal: 8,
+    marginRight: 8,
   },
   sendButton: {
     backgroundColor: '#FDD7E4',

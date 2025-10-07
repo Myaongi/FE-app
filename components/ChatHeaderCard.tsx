@@ -4,6 +4,7 @@ import FootIcon from '../assets/images/foot.svg';
 import MatchIcon from '../assets/images/match.svg';
 import PuppyIcon from '../assets/images/puppy.svg';
 import { formatDisplayDate } from '../utils/time';
+import UpdateLocationButton from './UpdateLocationButton';
 
 interface ChatHeaderCardProps {
   title: string;
@@ -14,7 +15,10 @@ interface ChatHeaderCardProps {
   status: '실종' | '발견' | '귀가 완료';
   photos?: string[];
   chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
+  isMyPost: boolean;
   onPress?: () => void;
+  onUpdateLocation?: () => void;
+  showDetails?: boolean;
 }
 
 const getContextTitle = (context: string) => {
@@ -38,7 +42,10 @@ const ChatHeaderCard: React.FC<ChatHeaderCardProps> = ({
   status,
   photos,
   chatContext,
+  isMyPost,
   onPress,
+  onUpdateLocation,
+  showDetails = true,
 }) => {
   const contextTitle = getContextTitle(chatContext);
   const statusBadgeColor = status === '실종' ? '#FDD7E4' : '#D3F9D8';
@@ -47,38 +54,45 @@ const ChatHeaderCard: React.FC<ChatHeaderCardProps> = ({
   return (
     <TouchableOpacity style={styles.cardContainer} onPress={onPress} activeOpacity={0.8}>
       <Text style={styles.contextTitle}>{contextTitle}</Text>
-      <View style={styles.contentWrapper}>
-        {imageUri ? (
-          <Image source={{ uri: imageUri }} style={styles.image} />
-        ) : (
-          <View style={styles.imagePlaceholder} />
-        )}
-        <View style={styles.infoSection}>
-          <View style={styles.titleRow}>
-            <Text style={styles.title} numberOfLines={1}>{title}</Text>
-            <View style={[styles.statusBadge, { backgroundColor: statusBadgeColor }]}>
-              <Text style={styles.statusText}>{status}</Text>
+      {showDetails && (
+        <>
+          <View style={styles.contentWrapper}>
+            {imageUri ? (
+              <Image source={{ uri: imageUri }} style={styles.image} />
+            ) : (
+              <View style={styles.imagePlaceholder} />
+            )}
+            <View style={styles.infoSection}>
+              <View style={styles.titleRow}>
+                <Text style={styles.title} numberOfLines={1}>{title}</Text>
+                <View style={[styles.statusBadge, { backgroundColor: statusBadgeColor }]}>
+                  <Text style={styles.statusText}>{status}</Text>
+                </View>
+              </View>
+              
+              {/* PostCard 스타일 적용 */}
+              <View style={styles.infoRow}>
+                <PuppyIcon width={16} height={16} style={styles.icon} />
+                <Text style={styles.infoText}>{species}</Text>
+                <Text style={styles.separator}>|</Text>
+                <Text style={styles.infoText}>{color}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <FootIcon width={16} height={16} style={styles.icon} />
+                <Text style={styles.infoText}>{location}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <MatchIcon width={16} height={16} style={styles.icon} />
+                <Text style={styles.infoText}>{formatDisplayDate(date)}</Text>
+              </View>
+
             </View>
           </View>
-          
-          {/* PostCard 스타일 적용 */}
-          <View style={styles.infoRow}>
-            <PuppyIcon width={16} height={16} style={styles.icon} />
-            <Text style={styles.infoText}>{species}</Text>
-            <Text style={styles.separator}>|</Text>
-            <Text style={styles.infoText}>{color}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <FootIcon width={16} height={16} style={styles.icon} />
-            <Text style={styles.infoText}>{location}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <MatchIcon width={16} height={16} style={styles.icon} />
-            <Text style={styles.infoText}>{formatDisplayDate(date)}</Text>
-          </View>
-
-        </View>
-      </View>
+          {chatContext === 'match' && isMyPost && onUpdateLocation && (
+            <UpdateLocationButton onPress={onUpdateLocation} />
+          )}
+        </>
+      )}
     </TouchableOpacity>
   );
 };

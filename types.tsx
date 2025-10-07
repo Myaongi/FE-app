@@ -17,6 +17,7 @@ export type ChatDetailParams = ChatRoomFromApi & {
   chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
   witnessData?: Message['witnessData'];
   type: 'lost' | 'witnessed'; // postType과 중복될 수 있으나, PostDetail 등에서 사용되므로 유지
+  sightCard?: SightCard;
 };
 
 export type RootStackParamList = {
@@ -198,6 +199,43 @@ name?: string;
 };
 
 // =========================================================================
+// 목격 카드 API 타입
+// =========================================================================
+
+export interface SightCardPayload {
+  postLostId: number;
+  date: number[];
+  time: number[];
+  longitude: number;
+  latitude: number;
+}
+
+export interface SightCard {
+  sightCardId: number;
+  postLostId: number;
+  postMemberId: number;
+  foundDate: string;
+  foundTime: string;
+  foundPlace: string;
+  longitude: number;
+  latitude: number;
+}
+
+// POST /api/sight-cards 응답의 chatRoom 타입
+export interface ApiChatRoomFromSightCard {
+  chatroomId: number;
+  member1Id: number;
+  member2Id: number;
+  createdAt: number[];
+}
+
+// POST /api/sight-cards 의 result 타입
+export interface CreateSightCardResult {
+  sightCard: SightCard;
+  chatRoom: ApiChatRoomFromSightCard;
+}
+
+// =========================================================================
 // 기타 타입
 // =========================================================================
 
@@ -265,6 +303,7 @@ export interface ApiChatRoom {
   postType: 'LOST' | 'FOUND';
   postTitle: string;
   postImageUrl: string | null;
+  postRegion: string;
 }
 
 // GET /api/messages/{chatroomId}
@@ -292,6 +331,7 @@ export interface ChatRoomFromApi {
   postType: 'LOST' | 'FOUND';
   postTitle: string;
   postImageUrl: string | null;
+  postRegion: string;
 }
 
 // getMessages가 반환하는 타입

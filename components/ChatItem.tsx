@@ -1,16 +1,17 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { mapLostTypeToKorean } from '../utils/format';
 
 export interface ChatData {
   id: string;
   name: string;
-  location: string;
+  postRegion: string;
   time: string;
   title: string;
   lastMessage: string;
   postType: 'LOST' | 'FOUND';
   unreadCount: number; 
+  postImageUrl: string | null;
 }
 
 export interface ChatItemProps {
@@ -32,11 +33,15 @@ const ChatItem = ({ chat, onPress }: ChatItemProps) => {
 
   return (
     <TouchableOpacity style={styles.chatItem} onPress={onPress}> 
-      <View style={styles.profilePlaceholder} />
+      {chat.postImageUrl ? (
+        <Image source={{ uri: chat.postImageUrl }} style={styles.profileImage} />
+      ) : (
+        <View style={styles.profilePlaceholder} />
+      )}
       <View style={styles.chatContent}>
         <View style={styles.chatHeader}>
           <Text style={styles.name}>{chat.name}</Text>
-          <Text style={styles.meta}>{chat.location} | {chat.time}</Text>
+          <Text style={styles.meta}>{chat.postRegion} | {chat.time}</Text>
         </View>
         <Text style={styles.title}>제목: {chat.title}</Text>
         <Text style={styles.message} numberOfLines={1}>{chat.lastMessage}</Text>
@@ -69,9 +74,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  profileImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 12,
+  },
   profilePlaceholder: {
-    width: 50,
-    height: 50,
+    width: 60,
+    height: 60,
     borderRadius: 8,
     backgroundColor: '#eee',
     marginRight: 12,

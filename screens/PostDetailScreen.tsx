@@ -1,5 +1,5 @@
 import { useNavigation, useRoute, RouteProp, useIsFocused } from '@react-navigation/native';
-import React, { useContext, useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   Alert,
   StyleSheet,
@@ -9,7 +9,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
-import { useAuth } from '../hooks/useAuth'; // useAuth 훅 임포트
+import { useAuth } from '../hooks/useAuth';
 import PostDetailContent from '../components/PostDetailContent';
 import WitnessModal from '../components/WitnessModal';
 import {
@@ -17,8 +17,9 @@ import {
   updatePostStatus,
   deletePost,
   createChatRoom,
+  createSightCard, // createSightCard 임포트
 } from '../service/mockApi';
-import { Post, RootStackParamList, StackNavigation } from '../types';
+import { Post, RootStackParamList, StackNavigation, SightCard } from '../types'; // SightCard 임포트
 
 type PostDetailRouteProp = RouteProp<RootStackParamList, 'PostDetail'>;
 
@@ -32,7 +33,7 @@ const PostDetailScreen = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const { isLoggedIn, userMemberName, userMemberId } = useAuth(); // useAuth 훅 사용
+  const { isLoggedIn, userMemberName, userMemberId } = useAuth();
   const isFocused = useIsFocused();
 
   const fetchPost = useCallback(async () => {
@@ -98,6 +99,7 @@ const PostDetailScreen = () => {
         postType: postTypeForApi,
         postTitle: post.title,
         postImageUrl: post.photos ? post.photos[0] : null,
+        postRegion: post.location,
         type: post.type,
         chatContext: context,
       });
@@ -108,7 +110,7 @@ const PostDetailScreen = () => {
     }
   };
 
-  const handleWitnessSubmit = async (witnessData: any) => {
+  const handleWitnessSubmit = async (witnessData: { date: string, time: string, location: string, latitude: number, longitude: number }) => {
     if (isSubmitting || !post || !userMemberName || !post.authorId) {
       Alert.alert("오류", "제보를 전송하기 위한 정보가 부족합니다.");
       return;
@@ -118,24 +120,41 @@ const PostDetailScreen = () => {
     setIsModalVisible(false);
     
     try {
-      const postTypeForApi = post.type === 'lost' ? 'LOST' : 'FOUND';
-      const newRoom = await createChatRoom(post.authorId, parseInt(post.id, 10), postTypeForApi);
+      // 1. 목격 카드와 채팅방 동시 생성
+      const dateParts = witnessData.date.split('.').map(part => parseInt(part.replace(/[^0-9]/g, ''), 10));
+      const timeParts = witnessData.time.split(':').map(part => parseInt(part.replace(/[^0-9]/g, ''), 10));
 
+      const sightCardPayload = {
+        postLostId: parseInt(post.id, 10),
+        date: [dateParts[0], dateParts[1], dateParts[2]],
+        time: [dateParts[0], dateParts[1], dateParts[2], timeParts[0], timeParts[1]],
+        longitude: witnessData.longitude,
+        latitude: witnessData.latitude,
+      };
+
+      const result = await createSightCard(sightCardPayload);
+      console.log('API Response from createSightCard:', JSON.stringify(result, null, 2));
+
+      const { sightCard, chatRoom } = result;
+
+      // 2. 채팅 화면으로 이동
+      const postTypeForApi = post.type === 'lost' ? 'LOST' : 'FOUND';
       navigation.navigate('ChatDetail', {
-        id: newRoom.chatroomId.toString(),
-        chatRoomId: newRoom.chatroomId.toString(),
+        id: chatRoom.chatroomId.toString(),
+        chatRoomId: chatRoom.chatroomId.toString(),
         partnerId: post.authorId,
         partnerNickname: post.userMemberName,
-        lastMessage: '',
-        lastMessageTime: new Date().toISOString(),
+        lastMessage: '', // 새 채팅방이므로 마지막 메시지는 없음
+        lastMessageTime: new Date().toISOString(), // 현재 시간으로 설정
         unreadCount: 0,
         postId: post.id,
         postType: postTypeForApi,
         postTitle: post.title,
-        postImageUrl: post.photos ? post.photos[0] : null,
+        postImageUrl: post.photos?.[0] ?? null,
+        postRegion: post.location,
         type: post.type,
         chatContext: 'lostPostReport',
-        witnessData: witnessData,
+        sightCard: sightCard, // 생성된 목격 카드 정보 전달
       });
     } catch (error: any) {
       console.error("Error submitting witness report:", error);
@@ -176,12 +195,6 @@ const PostDetailScreen = () => {
   const isMyPost = post.authorId !== undefined && userMemberId !== undefined 
   ? Number(post.authorId) === userMemberId
   : false;
-
-  console.log('DEBUG: PostDetailScreen - userMemberId:', userMemberId);
-  console.log('DEBUG: PostDetailScreen - post.authorId:', post.authorId);
-  console.log('DEBUG: PostDetailScreen - isMyPost:', isMyPost);
-  console.log('DEBUG: PostDetailScreen - Type of userMemberId:', typeof userMemberId);
-  console.log('DEBUG: PostDetailScreen - Type of post.authorId:', typeof post.authorId);
 
   return (
     <View style={styles.container}>

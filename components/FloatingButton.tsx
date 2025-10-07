@@ -16,7 +16,7 @@ const FloatingButton: React.FC<FloatingButtonProps> = ({ onPress }) => {
       onPress={onPress}
     >
       <LinearGradient
-        colors={['#FFFDE4','#C6E8E0', '#8ED7FF']}
+        colors={['#8ED7FF']}
         start={{ x: 0.0, y: 0.5 }}
         end={{ x: 1.0, y: 0.5 }}
         locations={[0.2761, 0.6132, 0.8853]}
@@ -54,13 +54,13 @@ const styles = StyleSheet.create({
   plusText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'chacol',
+    color: 'white',
     marginRight: 4,
   },
   buttonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: 'chacol',
+    color: 'white',
   },
 });
 

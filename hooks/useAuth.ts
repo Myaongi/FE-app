@@ -9,8 +9,5 @@ export const useAuth = (): AuthContextType & { userMemberId: number | null } => 
     throw new Error('useAuth must be used within an AuthProvider');
   }
 
-  return {
-    ...context,
-    userMemberId: context.userProfile?.memberId || null,
-  };
+  return context;
 };
