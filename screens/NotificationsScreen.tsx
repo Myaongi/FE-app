@@ -1,36 +1,82 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, SafeAreaView } from 'react-native';
-import { Notification, StackNavigation } from '../types';
-import { getNotifications } from '../service/mockApi';
+import React from 'react';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { useBadge } from '../contexts/BadgeContext';
+import { ApiNotification, StackNavigation } from '../types';
 import NotificationCard from '../components/NotificationCard';
 import BackIcon from '../assets/images/back.svg';
-import { useNavigation } from '@react-navigation/native';
 
 const NotificationsScreen = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { notifications, isLoading, markAsRead, chatList } = useBadge();
   const navigation = useNavigation<StackNavigation>();
 
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const data = await getNotifications();
-        setNotifications(data);
-      } catch (error) {
-        console.error('Failed to fetch notifications:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const handleNotificationPress = (notification: ApiNotification) => {
+    if (!notification.isRead) {
+      markAsRead(notification.notificationId);
+    }
 
-    fetchNotifications();
-  }, []);
+    const { screen, params } = notification.navigationTarget;
+
+    if (!screen || !params) {
+      console.log("알림에 유효한 navigationTarget이 없습니다.", notification);
+      return;
+    }
+
+    // PostDetail 화면으로 이동 (NEARBY_POST, NEW_MATCH 등)
+    if (screen === 'PostDetail') {
+      if (params.postId && params.postType) {
+        // 백엔드(FOUND)와 프론트(witnessed) 타입 매핑
+        const postTypeForNav = params.postType.toUpperCase() === 'LOST' ? 'lost' : 'witnessed';
+        navigation.navigate('PostDetail', { 
+          id: params.postId.toString(), 
+          type: postTypeForNav
+        });
+      } else {
+        console.warn(
+          'PostDetail 이동 실패: postId 또는 postType이 params에 없습니다.',
+          notification.navigationTarget
+        );
+      }
+      return;
+    }
+
+    // ChatDetail 화면으로 이동 (NEW_SIGHTING 등)
+    if (screen === 'ChatDetail') {
+      if (params.chatroomId) {
+        const targetChatRoom = chatList.find(chat => chat.id === params.chatroomId?.toString());
+
+        if (targetChatRoom) {
+          const chatContext = targetChatRoom.postType === 'LOST' ? 'lostPostReport' : 'witnessedPostReport';
+          const type = targetChatRoom.postType === 'LOST' ? 'lost' : 'witnessed';
+
+          navigation.navigate('ChatDetail', {
+            ...targetChatRoom,
+            chatContext: chatContext,
+            type: type,
+          });
+        } else {
+          console.warn(`ChatDetail 이동 실패: chatList에서 chatroomId ${params.chatroomId}를 찾을 수 없습니다.`);
+          Alert.alert("오류", "채팅방 정보를 찾을 수 없습니다. 채팅 목록을 최신으로 업데이트한 후 다시 시도해 주세요.");
+        }
+      } else {
+        console.warn(
+          'ChatDetail 이동 실패: chatroomId가 params에 없습니다.',
+          notification.navigationTarget
+        );
+      }
+      return;
+    }
+    
+    // 기타 다른 화면으로의 이동
+    // @ts-ignore
+    navigation.navigate(screen, params);
+  };
 
   const renderContent = () => {
-    if (loading) {
+    if (isLoading && notifications.length === 0) {
       return (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#0000ff" />
+          <ActivityIndicator size="large" color="#FFA001" />
         </View>
       );
     }
@@ -46,9 +92,14 @@ const NotificationsScreen = () => {
     return (
       <FlatList
         data={notifications}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <NotificationCard notification={item} />}
+        keyExtractor={(item) => item.notificationId.toString()}
+        renderItem={({ item }) => (
+          <TouchableOpacity onPress={() => handleNotificationPress(item)}>
+            <NotificationCard notification={item} />
+          </TouchableOpacity>
+        )}
         contentContainerStyle={styles.listContent}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
     );
   };
@@ -69,38 +120,43 @@ const NotificationsScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F8F8F8',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
     backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFEFEF',
   },
   backButton: {
     position: 'absolute',
     left: 16,
-    padding: 8,
+    padding: 4,
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#000',
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
   },
   emptyText: {
     fontSize: 16,
     color: '#888',
   },
   listContent: {
-    paddingVertical: 8,
+    paddingVertical: 0,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#EFEFEF',
+    marginLeft: 70, // Icon width + margins
   },
 });
 

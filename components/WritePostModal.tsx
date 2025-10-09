@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingBottom: 180,
+    paddingBottom: 170,
   },
   modalView: {
     margin: 20,
@@ -55,12 +55,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    minWidth: 200,
-    paddingVertical: 10,
+    minWidth: 160,
+    paddingVertical: 8.
   },
   button: {
     width: '100%',
-    paddingVertical: 15,
+    paddingVertical: 8,
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#fff',
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
   },

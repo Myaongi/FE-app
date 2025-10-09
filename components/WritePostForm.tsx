@@ -1,6 +1,7 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -365,7 +366,7 @@ const WritePostForm = forwardRef<WritePostFormRef, WritePostFormProps>(
     </Modal>
   );
 
-  // 이미지 피커 핸들러
+  // 이미지 피커 핸들러 (이미지 처리 로직 추가)
   const handleImagePicker = async () => {
     setImageLoading(true);
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -379,28 +380,46 @@ const WritePostForm = forwardRef<WritePostFormRef, WritePostFormProps>(
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
       selectionLimit: 10 - photos.length,
-      quality: 1,
+      quality: 1, // 원본 화질로 선택
     });
 
     if (!result.canceled && result.assets) {
-      const newImageItems: PhotoItem[] = result.assets.map(asset => ({
-        key: Math.random().toString(),
-        uri: asset.uri,
-      }));
+      const processedImages: PhotoItem[] = [];
 
-      setPhotos(prev => [...prev, ...newImageItems]);
-      setAiImage(null);
+      for (const asset of result.assets) {
+        try {
+          // 이미지 리사이징 및 압축
+          const manipResult = await ImageManipulator.manipulateAsync(
+            asset.uri,
+            [{ resize: { width: 1080 } }], // 가로 1080px로 리사이즈
+            { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG } // 80% 품질의 JPEG로 압축
+          );
+          
+          processedImages.push({
+            key: Math.random().toString(),
+            uri: manipResult.uri,
+          });
 
-      // 사진이 없었을 경우, AI 특징 추출
-      if (photos.length === 0) {
-        const aiFeatures = mockAiExtraction(result.assets[0].uri);
-        setForm(prevForm => ({
-          ...prevForm,
-          species: aiFeatures.species,
-          color: aiFeatures.color,
-          gender: aiFeatures.gender,
-        }));
-        setSpeciesQuery(aiFeatures.species);
+        } catch (error) {
+          console.error("Image manipulation failed:", error);
+          Alert.alert('오류', '이미지를 처리하는 중 오류가 발생했습니다.');
+        }
+      }
+
+      if (processedImages.length > 0) {
+        setPhotos(prev => [...prev, ...processedImages]);
+        setAiImage(null);
+
+        if (photos.length === 0) {
+          const aiFeatures = mockAiExtraction(processedImages[0].uri);
+          setForm(prevForm => ({
+            ...prevForm,
+            species: aiFeatures.species,
+            color: aiFeatures.color,
+            gender: aiFeatures.gender,
+          }));
+          setSpeciesQuery(aiFeatures.species);
+        }
       }
     }
     setImageLoading(false);

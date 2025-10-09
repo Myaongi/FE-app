@@ -298,24 +298,26 @@ const ChatDetailScreen = () => {
           <Text style={styles.headerTitle}>{otherUserName}</Text>
         </View>
 
-        <ChatHeaderCard
-          title={post.title}
-          species={post.species}
-          color={post.color}
-          location={post.location}
-          date={formatDisplayDate(post.date)}
-          status={mapStatusToKorean(post.status)}
-          photos={post.photos}
-          chatContext={chatContext}
-          isMyPost={isMyPost}
-          showDetails={!isWitnessedReportByAuthor}
-          onPress={() => {
-            if (!isWitnessedReportByAuthor) {
-              navigation.navigate('PostDetail', { id: post.id, type: post.type });
-            }
-          }}
-          onUpdateLocation={handleUpdateLocation}
-        />
+        {chatContext !== 'lostPostReport' && (
+          <ChatHeaderCard
+            title={post.title}
+            species={post.species}
+            color={post.color}
+            location={post.location}
+            date={formatDisplayDate(post.date)}
+            status={mapStatusToKorean(post.status)}
+            photos={post.photos}
+            chatContext={chatContext}
+            isMyPost={isMyPost}
+            showDetails={!isWitnessedReportByAuthor}
+            onPress={() => {
+              if (!isWitnessedReportByAuthor) {
+                navigation.navigate('PostDetail', { id: post.id, type: post.type });
+              }
+            }}
+            onUpdateLocation={handleUpdateLocation}
+          />
+        )}
       </View>
       <KeyboardAvoidingView 
         style={styles.container}

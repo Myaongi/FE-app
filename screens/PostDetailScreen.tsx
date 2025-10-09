@@ -17,9 +17,9 @@ import {
   updatePostStatus,
   deletePost,
   createChatRoom,
-  createSightCard, // createSightCard 임포트
+  createSightCard,
 } from '../service/mockApi';
-import { Post, RootStackParamList, StackNavigation, SightCard } from '../types'; // SightCard 임포트
+import { Post, RootStackParamList, StackNavigation, SightCard } from '../types';
 
 type PostDetailRouteProp = RouteProp<RootStackParamList, 'PostDetail'>;
 
@@ -120,7 +120,6 @@ const PostDetailScreen = () => {
     setIsModalVisible(false);
     
     try {
-      // 1. 목격 카드와 채팅방 동시 생성
       const dateParts = witnessData.date.split('.').map(part => parseInt(part.replace(/[^0-9]/g, ''), 10));
       const timeParts = witnessData.time.split(':').map(part => parseInt(part.replace(/[^0-9]/g, ''), 10));
 
@@ -133,19 +132,16 @@ const PostDetailScreen = () => {
       };
 
       const result = await createSightCard(sightCardPayload);
-      console.log('API Response from createSightCard:', JSON.stringify(result, null, 2));
-
       const { sightCard, chatRoom } = result;
 
-      // 2. 채팅 화면으로 이동
       const postTypeForApi = post.type === 'lost' ? 'LOST' : 'FOUND';
       navigation.navigate('ChatDetail', {
         id: chatRoom.chatroomId.toString(),
         chatRoomId: chatRoom.chatroomId.toString(),
         partnerId: post.authorId,
         partnerNickname: post.userMemberName,
-        lastMessage: '', // 새 채팅방이므로 마지막 메시지는 없음
-        lastMessageTime: new Date().toISOString(), // 현재 시간으로 설정
+        lastMessage: '',
+        lastMessageTime: new Date().toISOString(),
         unreadCount: 0,
         postId: post.id,
         postType: postTypeForApi,
@@ -154,7 +150,7 @@ const PostDetailScreen = () => {
         postRegion: post.location,
         type: post.type,
         chatContext: 'lostPostReport',
-        sightCard: sightCard, // 생성된 목격 카드 정보 전달
+        sightCard: sightCard,
       });
     } catch (error: any) {
       console.error("Error submitting witness report:", error);
@@ -162,6 +158,15 @@ const PostDetailScreen = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleEdit = () => {
+    if (!post) return;
+    navigation.navigate('WritePostScreen', { 
+      type: post.type, 
+      editMode: true, 
+      postId: post.id 
+    });
   };
 
   const handleDelete = () => {
@@ -184,8 +189,9 @@ const PostDetailScreen = () => {
     ]);
   };
 
+
   if (isLoading) {
-    return <View style={styles.loadingContainer}><ActivityIndicator size="large" /></View>;
+    return <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#FFABBF" /></View>;
   }
 
   if (!post) {
@@ -198,43 +204,25 @@ const PostDetailScreen = () => {
 
   return (
     <View style={styles.container}>
-      <SafeAreaView style={styles.headerSafeArea}>
-        <View style={styles.headerContainer}>
-          <View style={styles.sidePlaceholder} /> 
-          
-          <Text style={styles.postTypeText}>
-            {post.type === 'lost' ? '잃어버렸어요' : '발견했어요'}
-          </Text>
-          
-          {isMyPost ? (
-            <View style={styles.actionButtons}>
-              <TouchableOpacity onPress={() => navigation.navigate('WritePostScreen', { type: post.type, editMode: true, postId: post.id })}>
-                <Text style={styles.actionButtonText}>수정</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleDelete}>
-                <Text style={[styles.actionButtonText, styles.deleteButtonText]}>삭제</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.sidePlaceholder} />
-          )}
-        </View>
-      </SafeAreaView>
-
-      <PostDetailContent post={post}>
+      <PostDetailContent 
+        post={post} 
+        isMyPost={isMyPost} 
+        handleEdit={handleEdit} 
+        handleDelete={handleDelete}
+      >
         <SafeAreaView style={styles.bottomArea}>
           {post.status === 'RETURNED' ? (
-            <View style={styles.expiredPostContainer}>
-              <Text style={styles.expiredPostText}>귀가 완료된 게시물입니다.</Text>
+            <View style={[styles.bottomButton, styles.expiredPostContainer]}>
+              <Text style={styles.bottomButtonText}>귀가 완료된 게시물입니다.</Text>
             </View>
           ) : isMyPost ? (
-            <TouchableOpacity style={[styles.bottomButton, styles.fullWidthButton]} onPress={handleCompleteReturn}>
+            <TouchableOpacity style={styles.bottomButton} onPress={handleCompleteReturn}>
               <Text style={styles.bottomButtonText}>귀가 완료로 바꾸기</Text>
             </TouchableOpacity>
           ) : isLoggedIn ? (
             <TouchableOpacity style={styles.bottomButton} onPress={async () => {
               if (post.type === 'lost') {
-                setIsModalVisible(true);
+                 setIsModalVisible(true);
               } else {
                 await navigateToChat('witnessedPostReport');
               }
@@ -259,55 +247,43 @@ const PostDetailScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  headerSafeArea: { backgroundColor: '#fff' },
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-  },
-  postTypeText: { 
-    fontSize: 18, 
-    fontWeight: 'bold', 
-    color: '#333', 
+  container: { 
     flex: 1, 
-    textAlign: 'center', 
+    backgroundColor: '#FFFEF5' // 전체 배경색 통일
   },
-  
-  actionButtons: { 
-    flexDirection: 'row', 
-    gap: 15, 
-    minWidth: 60, 
-    justifyContent: 'flex-end',
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    backgroundColor: '#FFFEF5',
   },
-  sidePlaceholder: { 
-    minWidth: 60, 
-  },
-
-
-  actionButtonText: { color: '#007AFF', fontSize: 14, fontWeight: '500' },
-  deleteButtonText: { color: '#FF3B30' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   bottomArea: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
-    paddingTop: 10,
-    paddingBottom: 20,
+    backgroundColor: 'transparent', // 배경 투명 처리
     paddingHorizontal: 20,
   },
-  bottomButton: { backgroundColor: '#FF8C00', paddingVertical: 15, borderRadius: 10, alignItems: 'center' },
-  bottomButtonText: { fontSize: 18, color: '#fff', fontWeight: 'bold' },
-  expiredPostContainer: { backgroundColor: '#D3D3D3', paddingVertical: 15, borderRadius: 10, alignItems: 'center' },
-  expiredPostText: { fontSize: 18, color: '#fff', fontWeight: 'bold' },
-  fullWidthButton: { width: '100%' },
+  bottomButton: { 
+    backgroundColor: '#48BEFF', // 디자인 시안의 버튼 색상
+    paddingVertical: 16, 
+    borderRadius: 17, 
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 370,
+    height: 56,
+    marginBottom: 10, // 하단 여백
+    marginLeft: 15,
+  },
+  bottomButtonText: { 
+    fontSize: 18, 
+    color: '#fff', 
+    fontWeight: 'bold',
+  },
+  expiredPostContainer: { 
+    backgroundColor: '#D9D9D9', // 비활성 버튼 색상
+  },
 });
 
 export default PostDetailScreen;

@@ -52,14 +52,14 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   plusText: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 38,
     color: 'white',
-    marginRight: 4,
+    marginRight: 8,
+        transform: [{ translateY: -2}],
   },
   buttonText: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 20,
+    fontWeight: 'bold',
     color: 'white',
   },
 });

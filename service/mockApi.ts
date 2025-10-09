@@ -1,31 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
-import {
-  ApiResponse,
-  AuthResult,
-  ChatRoom,
-  CreateSightCardResult,
-  GeocodeResult,
-  LoginPayload,
-  Match,
-  Message,
-  Notification,
-  Post,
-  SignUpPayload,
-  User,
-  PostPayload,
-  ApiLostPost,
-  ApiFoundPost,
-  ApiReportPayload,
-  UserProfile,
-  ApiPost,
-  ChatRoomFromApi,
-  ApiChatRoom,
-  ChatMessage,
-  ApiMessage,
-  SightCardPayload,
-  SightCard,
-} from '../types';
+import {  ApiResponse,  AuthResult,  ChatRoom,  CreateSightCardResult,  GeocodeResult,  LoginPayload,  Match,  Message,  ApiNotification,  Post,  SignUpPayload,  User,  PostPayload,  ApiLostPost,  ApiFoundPost,  ApiReportPayload,  UserProfile,  ApiPost,  ChatRoomFromApi,  ApiChatRoom,  ChatMessage,  ApiMessage,  SightCardPayload,  SightCard,} from '../types';
 
 // =========================================================================
 // 1. API 설정 및 클라이언트
@@ -403,9 +378,14 @@ export const getAddressByCoordinates = async (latitude: number, longitude: numbe
 // 5. 위치 및 푸시 토큰 API
 // =========================================================================
 export const saveUserLocation = async (latitude: number, longitude: number): Promise<void> => {
-  console.log(`[MOCK] 사용자 위치 저장: 위도 ${latitude}, 경도 ${longitude}`);
-  // 실제 API 호출 로직: apiClient.post('/users/location', { latitude, longitude });
-  return new Promise(resolve => setTimeout(resolve, 500));
+  try {
+    // API 명세에 따라 POST /api/members/locations 로 수정
+    await apiClient.post('/members/locations', { latitude, longitude });
+    console.log(`[API] 사용자 위치 저장 완료: 위도 ${latitude}, 경도 ${longitude}`);
+  } catch (error) {
+    console.error('사용자 위치 저장 실패:', error);
+    // 위치 저장은 백그라운드 작업이므로 실패해도 앱 흐름을 막지 않습니다.
+  }
 };
 
 export const savePushToken = async (token: string): Promise<void> => {
@@ -694,6 +674,7 @@ export const updatePostStatus = async (postId: string, type: 'lost' | 'witnessed
 
 export const deletePost = async (postId: string, type: 'lost' | 'witnessed'): Promise<void> => {
   const endpoint = type === 'lost' ? `/lost-posts/${postId}` : `/found-posts/${postId}`;
+  console.log('Deleting post with endpoint:', endpoint);
   try {
     const response = await apiClient.delete(endpoint);
     if (!response.data.isSuccess) {
@@ -877,9 +858,35 @@ export const getMatchesForPost = async (postId: string): Promise<Match[]> => {
   return new Promise((resolve) => setTimeout(() => resolve(mockMatches), 500));
 };
 
-export const getNotifications = (): Promise<Notification[]> => {
-  return new Promise((resolve) => setTimeout(() => resolve(mockNotifications), 500));
+// =========================================================================
+// 9. 알림 API
+// =========================================================================
+
+export const getNotifications = async (): Promise<ApiNotification[]> => {
+  try {
+    const response = await apiClient.get<ApiResponse<ApiNotification[]>>('/notifications');
+    if (response.data.isSuccess) {
+      return response.data.result;
+    } else {
+      throw new Error(response.data.message);
+    }
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || '알림 목록을 불러오는 데 실패했습니다.');
+  }
 };
+
+export const markNotificationAsRead = async (notificationId: number): Promise<void> => {
+  try {
+    const response = await apiClient.patch(`/notifications/${notificationId}/read`);
+    if (!response.data.isSuccess) {
+      throw new Error(response.data.message);
+    }
+    console.log(`[API] 알림 ${notificationId} 읽음 처리 완료`);
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || '알림 읽음 처리에 실패했습니다.');
+  }
+};
+
 
 export const getChatRoomById = async (chatRoomId: string): Promise<ChatRoom | null> => {
   console.log(`[MOCK] ChatRoom 로드: ${chatRoomId}`);

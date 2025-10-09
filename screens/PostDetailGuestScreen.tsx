@@ -6,7 +6,8 @@ import {
   Text, 
   TouchableOpacity, 
   View,
-  SafeAreaView
+  SafeAreaView,
+  ActivityIndicator
 } from 'react-native';
 import PostDetailContent from '../components/PostDetailContent';
 import { getPostById } from '../service/mockApi';
@@ -50,40 +51,26 @@ const PostDetailGuestScreen = () => {
   if (!post) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>게시물을 불러오는 중...</Text>
+        <ActivityIndicator size="large" color="#FFABBF" />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      
-      <View style={styles.headerContainer}>
-
-        <View style={styles.headerDummySpace} /> 
-        
-        <Text style={styles.postTypeText}>
-          {post.type === 'lost' ? '잃어버렸어요' : '발견했어요'}
-        </Text>
-        
-        <View style={styles.headerDummySpace} /> 
-      </View>
-      
       <PostDetailContent post={post} isGuest={true}>
         <SafeAreaView style={styles.bottomArea}>
           {post.status === 'RETURNED' ? (
-            <View style={styles.expiredPostContainer}>
-              <Text style={styles.expiredPostText}>이 게시물은 귀가 완료되었습니다.</Text>
+            <View style={[styles.bottomButton, styles.expiredPostContainer]}>
+              <Text style={styles.bottomButtonText}>귀가 완료된 게시물입니다.</Text>
             </View>
           ) : (
             <TouchableOpacity
               style={styles.bottomButton}
-              onPress={() => {
-                requireLoginAlert();
-              }}
+              onPress={requireLoginAlert}
             >
               <Text style={styles.bottomButtonText}>
-                {post.type === 'lost' ? '발견했어요' : '1:1 채팅하기'}
+                로그인하고 {post.type === 'lost' ? '발견 정보 남기기' : '채팅하기'}
               </Text>
             </TouchableOpacity>
           )}
@@ -94,70 +81,42 @@ const PostDetailGuestScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
+  container: { 
+    flex: 1, 
+    backgroundColor: '#FFFEF5' // 전체 배경색 통일
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
     alignItems: 'center',
+    backgroundColor: '#FFFEF5',
   },
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    paddingHorizontal: 16, 
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-    marginTop: 40,
-  },
-  postTypeText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
- 
-  },
-  
-  headerDummySpace: {
-    width: 40, 
-    height: 24, 
-  },
-
   bottomArea: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
-    paddingTop: 10,
-    paddingBottom: 20, 
+    backgroundColor: 'transparent', // 배경 투명 처리
+    paddingHorizontal: 20,
   },
-  bottomButton: {
-    marginHorizontal: 20,
-    backgroundColor: '#FF8C00',
-    paddingVertical: 15,
-    borderRadius: 10,
+  bottomButton: { 
+    backgroundColor: '#48BEFF', // 디자인 시안의 버튼 색상
+    paddingVertical: 16, 
+    borderRadius: 17, 
     alignItems: 'center',
+    justifyContent: 'center',
+    width: 370,
+    height: 56,
+    marginBottom: 10, // 하단 여백
+    marginLeft: 15,
   },
-  bottomButtonText: {
-    fontSize: 18,
-    color: '#fff',
+  bottomButtonText: { 
+    fontSize: 18, 
+    color: '#fff', 
     fontWeight: 'bold',
   },
-  expiredPostContainer: {
-    marginHorizontal: 20,
-    backgroundColor: '#D3D3D3',
-    paddingVertical: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  expiredPostText: {
-    fontSize: 18,
-    color: '#fff',
-    fontWeight: 'bold',
+  expiredPostContainer: { 
+    backgroundColor: '#D9D9D9', // 비활성 버튼 색상
   },
 });
 

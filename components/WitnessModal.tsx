@@ -5,6 +5,14 @@ import { geocodeAddress, getCoordinatesByPlaceId } from '../service/mockApi';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { GeocodeResult } from '../types';
 
+// 아이콘 임포트
+import CalendarIcon from '../assets/images/calendar.svg';
+import ClockIcon from '../assets/images/clock.svg';
+import LocationIcon from '../assets/images/location.svg';
+import YellowCalendarIcon from '../assets/images/yellocalendar.svg';
+import YellowClockIcon from '../assets/images/yellowclock.svg';
+import YellowLocationIcon from '../assets/images/yellowlocation.svg';
+
 interface WitnessModalProps {
   visible: boolean;
   onClose: () => void;
@@ -12,8 +20,8 @@ interface WitnessModalProps {
 }
 
 const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit }) => {
-  const [witnessDate, setWitnessDate] = useState(new Date().toLocaleDateString('ko-KR').replace(/\s/g, ''));
-  const [witnessTime, setWitnessTime] = useState(new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }));
+  const [witnessDate, setWitnessDate] = useState('');
+  const [witnessTime, setWitnessTime] = useState('');
   const [witnessLocation, setWitnessLocation] = useState('');
   const [searchResults, setSearchResults] = useState<GeocodeResult[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<{
@@ -31,13 +39,12 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
     setShow(false);
     
     if (event.type === 'dismissed') {
-      setShow(false);
       return;
     }
     
     if (mode === 'date') {
       setDate(currentDate);
-      setWitnessDate(currentDate.toLocaleDateString('ko-KR').replace(/\s/g, ''));
+      setWitnessDate(currentDate.toLocaleDateString('ko-KR').replace(/\s/g, '').slice(0, -1));
     } else {
       setDate(currentDate);
       setWitnessTime(currentDate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }));
@@ -58,14 +65,6 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
       try {
         const results = await geocodeAddress(text);
         setSearchResults(results);
-        if (results && results.length > 0) {
-          const firstResult = results[0];
-          const coords = await getCoordinatesByPlaceId(firstResult.id);
-          setSelectedLocation({
-            address: firstResult.address,
-            ...coords,
-          });
-        }
       } catch (error) {
         console.error('위치 검색 중 오류 발생:', error);
         setSearchResults([]);
@@ -120,62 +119,72 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
         <View style={styles.centeredView}>
           <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalView}>
-              <Text style={styles.title}>발견했어요!</Text>
-              
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>발견 날짜</Text>
-                <TouchableOpacity style={styles.dateInput} onPress={showDatePicker}>
-                  <Text style={witnessDate ? styles.filledText : styles.placeholderText}>{witnessDate}</Text>
-                </TouchableOpacity>
+              <View style={styles.modalHeader}>
+                <Text style={styles.title}>발견했어요!</Text>
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>발견 시간</Text>
-                <TouchableOpacity style={styles.dateInput} onPress={showTimePicker}>
-                  <Text style={witnessTime ? styles.filledText : styles.placeholderText}>{witnessTime}</Text>
-                </TouchableOpacity>
-              </View>
+              <View style={styles.modalBody}>
+                <View style={styles.inputGroup}>
+                  {witnessDate ? <YellowCalendarIcon width={24} height={24}/> : <CalendarIcon width={24} height={24}/>}
+                  <Text style={styles.inputLabel}>발견 날짜</Text>
+                  <TouchableOpacity style={styles.dateInput} onPress={showDatePicker}>
+                    <Text style={witnessDate ? styles.filledText : styles.placeholderText}>{witnessDate || '날짜를 선택하세요'}</Text>
+                  </TouchableOpacity>
+                </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>발견 장소</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder=""
-                  value={witnessLocation}
-                  onChangeText={handleLocationSearch}
-                />
-                {searchResults.length > 0 && (
-                  <View style={styles.searchResultsContainer}>
-                    <FlatList
-                      data={searchResults}
-                      keyExtractor={(item) => item.id}
-                      renderItem={({ item }) => (
-                        <TouchableOpacity style={styles.searchItem} onPress={() => handleLocationSelect(item)}>
-                          <Text>{item.address}</Text>
-                        </TouchableOpacity>
-                      )}
+                <View style={styles.inputGroup}>
+                  {witnessTime ? <YellowClockIcon width={24} height={24}/> : <ClockIcon width={24} height={24}/>}
+                  <Text style={styles.inputLabel}>발견 시간</Text>
+                  <TouchableOpacity style={styles.dateInput} onPress={showTimePicker}>
+                    <Text style={witnessTime ? styles.filledText : styles.placeholderText}>{witnessTime || '시간을 선택하세요'}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.locationSection}>
+                  <View style={styles.inputGroup}>
+                    {selectedLocation ? <YellowLocationIcon width={24} height={24}/> : <LocationIcon width={24} height={24}/>}
+                    <Text style={styles.inputLabel}>발견 장소</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="장소를 검색하세요"
+                      value={witnessLocation}
+                      onChangeText={handleLocationSearch}
                     />
                   </View>
-                )}
-              </View>
 
-              <MapViewComponent
-                initialRegion={{
-                  latitude: 37.5665,
-                  longitude: 126.9780,
-                  latitudeDelta: 0.0922,
-                  longitudeDelta: 0.0421,
-                }}
-                markerCoords={selectedLocation ? {
-                  latitude: selectedLocation.latitude,
-                  longitude: selectedLocation.longitude,
-                  title: selectedLocation.address,
-                } : undefined}
-              />
-              
-              <TouchableOpacity style={[styles.submitButton, !isFormValid && styles.disabledButton]} onPress={handleSubmitPress} disabled={!isFormValid}>
-                <Text style={styles.submitButtonText}>발견했어요</Text>
-              </TouchableOpacity>
+                  {searchResults.length > 0 && (
+                    <View style={styles.searchResultsContainer}>
+                      <FlatList
+                        data={searchResults}
+                        keyExtractor={(item) => item.id}
+                        renderItem={({ item }) => (
+                          <TouchableOpacity style={styles.searchItem} onPress={() => handleLocationSelect(item)}>
+                            <Text>{item.address}</Text>
+                          </TouchableOpacity>
+                        )}
+                      />
+                    </View>
+                  )}
+                </View>
+
+                <MapViewComponent
+                  initialRegion={{
+                    latitude: selectedLocation?.latitude || 37.5665,
+                    longitude: selectedLocation?.longitude || 126.9780,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                  }}
+                  markerCoords={selectedLocation ? {
+                    latitude: selectedLocation.latitude,
+                    longitude: selectedLocation.longitude,
+                    title: selectedLocation.address,
+                  } : undefined}
+                />
+                
+                <TouchableOpacity style={[styles.submitButton, !isFormValid && styles.disabledButton]} onPress={handleSubmitPress} disabled={!isFormValid}>
+                  <Text style={styles.submitButtonText}>발견카드 발송하기</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </TouchableWithoutFeedback>
         </View>
@@ -210,64 +219,82 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalView: {
-    margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 20,
     width: '90%',
+    borderRadius: 10,
+    overflow: 'hidden', // 자식 뷰의 borderRadius를 적용하기 위해
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
   },
+  modalHeader: {
+    backgroundColor: '#FEF3B1',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#D6D6D6',
+  },
+  modalBody: {
+    backgroundColor: '#FFFEF5',
+    padding: 20,
+  },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 16,
     textAlign: 'center',
+    color: '#333',
   },
   inputGroup: {
-    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  locationSection: {
+    zIndex: 10, // 검색 결과가 지도 위에 오도록
   },
   inputLabel: {
     fontSize: 14,
     color: '#333',
-    marginBottom: 4,
+    fontWeight: 'bold',
+    marginLeft: 8,
+    width: 60, // 레이블 너비 고정
   },
   input: {
+    flex: 1,
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 8,
     padding: 10,
-    fontSize: 16,
+    fontSize: 14,
+    backgroundColor: '#fff',
   },
   dateInput: {
+    flex: 1,
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 8,
     padding: 10,
     minHeight: 44,
     justifyContent: 'center',
+    backgroundColor: '#fff',
   },
   placeholderText: {
-    fontSize: 16,
-    color: '#ccc',
+    fontSize: 14,
+    color: '#999',
   },
   filledText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#333',
   },
   searchResultsContainer: {
-    position: 'absolute',
-    top: 60,
-    width: '100%',
+    // position: 'absolute' 제거
     backgroundColor: 'white',
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 8,
     maxHeight: 150,
-    zIndex: 10,
+    marginTop: -16, // inputGroup의 marginBottom과 상쇄
+    marginBottom: 16, // 아래 요소와의 간격
   },
   searchItem: {
     padding: 12,
@@ -275,7 +302,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f0f0f0',
   },
   submitButton: {
-    backgroundColor: '#FF8C00',
+    backgroundColor: '#48BEFF',
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
@@ -287,7 +314,7 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   disabledButton: {
-    backgroundColor: '#D3D3D3',
+    backgroundColor: '#E0E0E0',
   },
   pickerModalContainer: {
     flex: 1,
@@ -296,23 +323,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   pickerContainer: {
-    backgroundColor: '#333', 
+    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
     width: '80%',
-  },
-  pickerDoneButton: {
-    marginTop: 10,
-    alignSelf: 'flex-end',
-    backgroundColor: '#f0f0f0',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  pickerDoneText: {
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: 'bold',
   },
 });
 

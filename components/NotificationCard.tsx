@@ -1,43 +1,38 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigation, Notification } from '../types';
+import { View, Text, StyleSheet } from 'react-native';
+import { ApiNotification } from '../types';
+import { formatRelativeTime } from '../utils/time';
+import DogFootIcon from '../assets/images/foot.svg';
 
 interface NotificationCardProps {
-  notification: Notification;
+  notification: ApiNotification;
 }
 
+const toISOString = (dateArray: number[]): string => {
+  if (!dateArray || dateArray.length < 6) return new Date().toISOString();
+  return new Date(
+    dateArray[0],
+    dateArray[1] - 1,
+    dateArray[2],
+    dateArray[3],
+    dateArray[4],
+    dateArray[5]
+  ).toISOString();
+};
+
 const NotificationCard = ({ notification }: NotificationCardProps) => {
-  const navigation = useNavigation<StackNavigation>();
-
-  const handlePress = () => {
-    if (!notification.postId || !notification.postType) return;
-
-    switch (notification.type) {
-      case 'MATCH_FOUND':
-        navigation.navigate('RootTab', { 
-          screen: 'Match', 
-          params: { postId: notification.postId }, 
-        });
-        break;
-      case 'WITNESS_REPORT':
-      case 'NEW_POST_NEARBY':
-        navigation.navigate('PostDetail', { id: notification.postId, type: notification.postType });
-        break;
-    }
-  };
+  const timeAgo = formatRelativeTime(toISOString(notification.createdAt));
 
   return (
-    <TouchableOpacity style={styles.container} onPress={handlePress}>
-      {notification.thumbnail && (
-        <Image source={{ uri: notification.thumbnail }} style={styles.thumbnail} />
-      )}
-      <View style={styles.content}>
-        <Text style={styles.title}>{notification.title}</Text>
-        <Text style={styles.message} numberOfLines={2}>{notification.message}</Text>
-        <Text style={styles.timestamp}>{notification.timestamp}</Text>
+    <View style={[styles.container, !notification.isRead && styles.unread]}>
+      <View style={styles.iconContainer}>
+        <DogFootIcon width={28} height={28} fill={!notification.isRead ? "#FFA001" : "#CCCCCC"}/>
       </View>
-    </TouchableOpacity>
+      <View style={styles.content}>
+        <Text style={styles.message} numberOfLines={3}>{notification.message}</Text>
+        <Text style={styles.timestamp}>{timeAgo}</Text>
+      </View>
+    </View>
   );
 };
 
@@ -45,33 +40,30 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    backgroundColor: '#fff',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    backgroundColor: '#F5F5F5',
   },
-  thumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 12,
+  unread: {
+    backgroundColor: '#FFFFFF',
+  },
+  iconContainer: {
+    marginRight: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     flex: 1,
   },
-  title: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  message: {
+    fontSize: 15,
+    color: '#333',
+    lineHeight: 22,
     marginBottom: 4,
   },
-  message: {
-    fontSize: 14,
-    color: '#666',
-  },
   timestamp: {
-    fontSize: 12,
-    color: '#aaa',
-    marginTop: 4,
+    fontSize: 13,
+    color: '#888',
   },
 });
 

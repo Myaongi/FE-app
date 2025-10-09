@@ -269,20 +269,22 @@ export interface ChatRoom {
   chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
 }
 
-export interface Notification {
-  id: string;
-  type: 'MATCH_FOUND' | 'WITNESS_REPORT' | 'NEW_POST_NEARBY';
-  title: string;
-  message: string;
-timestamp: string;
-  thumbnail?: string;
-  postId?: string; 
-  postType?: 'lost' | 'witnessed';
+export interface NavigationTarget {
+  screen: keyof RootStackParamList;
+  params: {
+    postId?: number;
+    chatroomId?: number;
+    [key: string]: any;
+  };
 }
 
-export interface PushNotificationData {
-  type: 'MATCH_FOUND' | 'WITNESS_REPORT' | 'NEW_POST_NEARBY';
-  postId?: string;
+export interface ApiNotification {
+  notificationId: number;
+  type: string;
+  message: string;
+  isRead: boolean;
+  createdAt: number[];
+  navigationTarget: NavigationTarget;
 }
 
 // =========================================================================
