@@ -216,8 +216,8 @@ const PostDetailScreen = () => {
               <Text style={styles.bottomButtonText}>귀가 완료된 게시물입니다.</Text>
             </View>
           ) : isMyPost ? (
-            <TouchableOpacity style={styles.bottomButton} onPress={handleCompleteReturn}>
-              <Text style={styles.bottomButtonText}>귀가 완료로 바꾸기</Text>
+            <TouchableOpacity style={[styles.bottomButton, styles.myPostBottomButton]} onPress={handleCompleteReturn}>
+              <Text style={[styles.bottomButtonText, styles.myPostBottomButtonText]}>귀가 완료로 변경</Text>
             </TouchableOpacity>
           ) : isLoggedIn ? (
             <TouchableOpacity style={styles.bottomButton} onPress={async () => {
@@ -283,6 +283,15 @@ const styles = StyleSheet.create({
   },
   expiredPostContainer: { 
     backgroundColor: '#D9D9D9', // 비활성 버튼 색상
+  },
+  myPostBottomButton: {
+    backgroundColor: '#FFF',
+    borderWidth: 2,
+    borderColor: '#8ED7FF',
+    borderRadius: 18,
+  },
+  myPostBottomButtonText: {
+    color: '#8ED7FF',
   },
 });
 

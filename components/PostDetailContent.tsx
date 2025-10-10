@@ -20,6 +20,8 @@ import BackIcon from '../assets/images/back.svg';
 import ReportIcon from '../assets/images/report.svg';
 import LogoIcon from '../assets/images/logo.svg';
 import FootIcon from '../assets/images/foot.svg';
+import EditIcon from '../assets/images/edit.svg';
+import DeleteIcon from '../assets/images/delete.svg';
 
 // 색상별 아이콘 임포트
 import PinkCalendarIcon from '../assets/images/pinkcalendar.svg';
@@ -134,10 +136,10 @@ const PostDetailContent = ({ post, children, isGuest = false, isMyPost = false, 
           {isMyPost ? (
             <View style={styles.headerActions}>
               <TouchableOpacity onPress={handleEdit}>
-                <Text style={styles.actionText}>수정</Text>
+                <EditIcon width={24} height={24} />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleDelete}>
-                <Text style={[styles.actionText, styles.deleteText]}>삭제</Text>
+                <DeleteIcon width={24} height={24} />
               </TouchableOpacity>
             </View>
           ) : (
@@ -343,13 +345,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 16,
   },
-  actionText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  deleteText: {
-    color: '#FF3B30',
-  },
+ 
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -444,8 +440,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#000',
     lineHeight: 24,
-    marginBottom: 24,
-    marginTop: 2,
+    marginBottom: 16,
     marginLeft: 10,
     fontWeight: 'bold',
   },
