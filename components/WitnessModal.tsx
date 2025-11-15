@@ -9,9 +9,8 @@ import { GeocodeResult } from '../types';
 import CalendarIcon from '../assets/images/calendar.svg';
 import ClockIcon from '../assets/images/clock.svg';
 import LocationIcon from '../assets/images/location.svg';
-import YellowCalendarIcon from '../assets/images/yellocalendar.svg';
-import YellowClockIcon from '../assets/images/yellowclock.svg';
-import YellowLocationIcon from '../assets/images/yellowlocation.svg';
+import CancelIcon from '../assets/images/cancel.svg';
+import FoundPin from '../assets/images/foundpin.svg';
 
 interface WitnessModalProps {
   visible: boolean;
@@ -33,6 +32,12 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
   const [date, setDate] = useState(new Date());
   const [mode, setMode] = useState<'date' | 'time'>('date');
   const [show, setShow] = useState(false);
+  const [mapRegion, setMapRegion] = useState({
+    latitude: 37.5665,
+    longitude: 126.9780,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  });
 
   const onChange = (event: any, selectedValue?: Date) => {
     const currentDate = selectedValue || date;
@@ -69,7 +74,8 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
         console.error('위치 검색 중 오류 발생:', error);
         setSearchResults([]);
       }
-    } else {
+    }
+    else {
       setSearchResults([]);
     }
   };
@@ -83,6 +89,14 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
       });
       setWitnessLocation(item.address);
       setSearchResults([]);
+      setMapRegion({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+      console.log('WitnessModal: selectedLocation updated', { selectedLocation: { address: item.address, ...coords } });
+      console.log('WitnessModal: mapRegion updated', { mapRegion: { latitude: coords.latitude, longitude: coords.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 } });
     } catch (error) {
       console.error('좌표 변환 중 오류 발생:', error);
     }
@@ -121,32 +135,42 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
             <View style={styles.modalView}>
               <View style={styles.modalHeader}>
                 <Text style={styles.title}>발견했어요!</Text>
+                <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                  <CancelIcon width={24} height={24} />
+                </TouchableOpacity>
               </View>
 
               <View style={styles.modalBody}>
                 <View style={styles.inputGroup}>
-                  {witnessDate ? <YellowCalendarIcon width={24} height={24}/> : <CalendarIcon width={24} height={24}/>}
+                  <View style={{ marginLeft: 1 }}>
+                    <CalendarIcon width={24} height={24} color={witnessDate ? '#FFDB00' : '#D6D6D6'} />
+                  </View>
                   <Text style={styles.inputLabel}>발견 날짜</Text>
-                  <TouchableOpacity style={styles.dateInput} onPress={showDatePicker}>
+                  <TouchableOpacity style={[styles.dateInput, { marginLeft: 45, marginRight: 1 }]} onPress={showDatePicker}>
                     <Text style={witnessDate ? styles.filledText : styles.placeholderText}>{witnessDate || '날짜를 선택하세요'}</Text>
                   </TouchableOpacity>
                 </View>
 
                 <View style={styles.inputGroup}>
-                  {witnessTime ? <YellowClockIcon width={24} height={24}/> : <ClockIcon width={24} height={24}/>}
+                  <View style={{ marginLeft: 1 }}>
+                    <ClockIcon width={24} height={24} color={witnessTime ? '#FFDB00' : '#D6D6D6'} />
+                  </View>
                   <Text style={styles.inputLabel}>발견 시간</Text>
-                  <TouchableOpacity style={styles.dateInput} onPress={showTimePicker}>
+                  <TouchableOpacity style={[styles.dateInput, { marginLeft: 45,marginRight: 1 }]} onPress={showTimePicker}>
                     <Text style={witnessTime ? styles.filledText : styles.placeholderText}>{witnessTime || '시간을 선택하세요'}</Text>
                   </TouchableOpacity>
                 </View>
 
                 <View style={styles.locationSection}>
                   <View style={styles.inputGroup}>
-                    {selectedLocation ? <YellowLocationIcon width={24} height={24}/> : <LocationIcon width={24} height={24}/>}
+                    <View style={{ marginLeft: 1 }}>
+                      <LocationIcon width={24} height={24} color={witnessLocation ? '#FFDB00' : '#D6D6D6'} />
+                    </View>
                     <Text style={styles.inputLabel}>발견 장소</Text>
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, { marginLeft: 45, marginRight: 1 }]} 
                       placeholder="장소를 검색하세요"
+                      placeholderTextColor="#999"
                       value={witnessLocation}
                       onChangeText={handleLocationSearch}
                     />
@@ -168,17 +192,13 @@ const WitnessModal: React.FC<WitnessModalProps> = ({ visible, onClose, onSubmit 
                 </View>
 
                 <MapViewComponent
-                  initialRegion={{
-                    latitude: selectedLocation?.latitude || 37.5665,
-                    longitude: selectedLocation?.longitude || 126.9780,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
-                  }}
-                  markerCoords={selectedLocation ? {
+                  style={styles.mapView}
+                  region={mapRegion}
+                  markers={selectedLocation ? [{
                     latitude: selectedLocation.latitude,
                     longitude: selectedLocation.longitude,
-                    title: selectedLocation.address,
-                  } : undefined}
+                    component: <FoundPin width={40} height={40} />,
+                  }] : []}
                 />
                 
                 <TouchableOpacity style={[styles.submitButton, !isFormValid && styles.disabledButton]} onPress={handleSubmitPress} disabled={!isFormValid}>
@@ -230,19 +250,29 @@ const styles = StyleSheet.create({
   },
   modalHeader: {
     backgroundColor: '#FEF3B1',
-    padding: 16,
+    padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#D6D6D6',
+    shadowColor: 'rgba(0, 0, 0, 0.25)',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 2,
+    elevation: 2,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   modalBody: {
     backgroundColor: '#FFFEF5',
     padding: 20,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: 700,
     textAlign: 'center',
-    color: '#333',
+    color: '#000',
+    flex: 1,
+    marginLeft: 24, 
   },
   inputGroup: {
     flexDirection: 'row',
@@ -254,27 +284,30 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: '#333',
-    fontWeight: 'bold',
-    marginLeft: 8,
+    fontWeight: 600,
+    color: '#424242',
+    marginLeft: 10,
     width: 60, // 레이블 너비 고정
   },
   input: {
-    flex: 1,
+
+    width: 181,
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 8,
-    padding: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
     fontSize: 14,
     backgroundColor: '#fff',
   },
   dateInput: {
-    flex: 1,
+    width: 181,
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 8,
-    padding: 10,
-    minHeight: 44,
+    paddingVertical: 4,
+    paddingHorizontal: 14,
+    minHeight: 42,
     justifyContent: 'center',
     backgroundColor: '#fff',
   },
@@ -287,7 +320,6 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   searchResultsContainer: {
-    // position: 'absolute' 제거
     backgroundColor: 'white',
     borderWidth: 1,
     borderColor: '#e0e0e0',
@@ -300,6 +332,10 @@ const styles = StyleSheet.create({
     padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
+  },
+  mapView: {
+    height: 106.82,
+    alignSelf: 'stretch',
   },
   submitButton: {
     backgroundColor: '#48BEFF',
@@ -323,10 +359,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   pickerContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: '#424242',
     borderRadius: 12,
     padding: 16,
     width: '80%',
+  },
+  closeButton: {
+    padding: 5,
   },
 });
 

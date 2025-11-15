@@ -6,7 +6,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 // =========================================================================
 
 export type RootTabParamList = {
-  Lost: undefined;
+  Lost: { initialTab?: 'lost' | 'found' };
   Match: { postId?: string };
   Chat: undefined;
   MyPage: undefined;
@@ -14,40 +14,34 @@ export type RootTabParamList = {
 
 // ChatDetail 스크린으로 전달될 파라미터 타입 정의
 export type ChatDetailParams = ChatRoomFromApi & {
-  chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
   witnessData?: Message['witnessData'];
-  type: 'lost' | 'witnessed'; // postType과 중복될 수 있으나, PostDetail 등에서 사용되므로 유지
+  type: 'lost' | 'found'; // postType과 중복될 수 있으나, PostDetail 등에서 사용되므로 유지
   sightCard?: SightCard;
+  myLostPostId?: string;
+  userPetName?: string;
 };
 
 export type RootStackParamList = {
   RootTab: NavigatorScreenParams<RootTabParamList>;
   PostDetail: { 
     id: string; 
-    type: 'lost' | 'witnessed';
+    type: 'lost' | 'found';
   };
   WritePostScreen: { 
-    type: 'lost' | 'witnessed';
+    type: 'lost' | 'found';
     editMode?: boolean;
     postId?: string;
   };
   ChatDetail: ChatDetailParams;
   NotificationsScreen: undefined;
   Report: {
-    postId: string;
-    postType: 'lost' | 'witnessed';
-    postInfo: {
-      userName: string;
-      title: string;
-      location: string;
-      time: string;
-    };
+    post: Post;
   };
 };
 
 export type AuthStackParamList = {
   Lost: undefined;
-  PostDetail: { id: string; type: 'lost' | 'witnessed' };
+  PostDetail: { id: string; type: 'lost' | 'found' };
   LoginScreen: undefined;
   SignUpScreen: undefined;
 };
@@ -160,14 +154,21 @@ export interface ApiReportPayload {
 
 // --- 앱 내부에서 사용하는 표준 게시글 타입 ---
 
+export interface Spot {
+  latitude: number;
+  longitude: number;
+  spotDateTime: number[];
+}
+
 export interface Post {
   id: string;
-  type: 'lost' | 'witnessed';
+  type: 'lost' | 'found';
   title: string;
   species: string;      // from dogType
   color: string;        // from dogColor
   location: string;
-  date: string;           // ISO format string
+  region?: string;
+  date: string | number[] | Date; // Can be ISO string, number array, or Date object
   status: 'MISSING' | 'SIGHTED' | 'RETURNED'; // from status or dogStatus
   name?: string;          // from dogName
   gender?: 'MALE' | 'FEMALE' | 'NEUTRAL'; // from dogGender
@@ -175,16 +176,28 @@ export interface Post {
   photos?: string[];      // from image or realImages
   latitude?: number;
   longitude?: number;
+  longitudes?: number[]; // 추가된 필드
+  latitudes?: number[]; // 추가된 필드
   userMemberName: string; // from authorName
   authorId?: number; // from authorId
   uploadedAt: string;     // from createdAt
   timeAgo?: string;
+  spots?: Spot[]; // 추가된 필드
+  isAiImage?: boolean;
+  aiImage?: string | null;
+  hideBadge?: boolean; // Add this line
 }
 
 // --- 게시글 생성/수정시 UI에서 API 레이어로 전달하는 데이터 타입 ---
 
+export interface PostFilters {
+  distance: number | 'all';
+  time: number | 'all';
+  sortBy: 'latest' | 'distance';
+}
+
 export type PostPayload = {
-  type: 'lost' | 'witnessed';
+  type: 'lost' | 'found';
   title: string;
   species: string;
   color: string;
@@ -192,9 +205,10 @@ export type PostPayload = {
   location: string;
   latitude: number;
   longitude: number;
-name?: string;
+  name?: string;
   gender?: 'MALE' | 'FEMALE' | 'NEUTRAL';
   features?: string;
+  isAiImage?: boolean;
   // photos는 별도의 인자로 전달되므로 여기에 포함하지 않음
 };
 
@@ -236,20 +250,88 @@ export interface CreateSightCardResult {
 }
 
 // =========================================================================
+// 매칭 API 타입
+// =========================================================================
+
+export interface ApiMatchResponse {
+  dogName: string;
+  pageResponse: {
+    content: ApiMatch[];
+    hasNext: boolean;
+  };
+}
+
+export interface MatchResponse {
+  dogName: string;
+  matches: Match[];
+  hasNext: boolean;
+}
+
+// =========================================================================
 // 기타 타입
 // =========================================================================
 
+export interface ApiMatch {
+  matchingId: number;
+  postId: number;
+  authorId: number;
+  postType: 'LOST' | 'FOUND';
+  title: string;
+  dogType: string;
+  dogColor: string;
+  location: string;
+  similarity: number;
+  image: string;
+  timeAgo: string;
+}
+
 export interface Match {
-  id: string;
-  type: 'lost' | 'witnessed';
+  id: string; // postId
+  matchingId: number;
+  authorId: number;
+  type: 'lost' | 'found';
   title: string;
   species: string;
   color: string;
   location: string;
-  date: string;
-  dateLabel: '잃어버린 날짜/시간' | '발견한 날짜/시간';
+  timeAgo: string;
   similarity: number;
-  userMemberName?: string;
+  image: string;
+  userMemberName?: string; // This might need to be fetched separately if needed
+}
+
+export interface ChatRoomMatchingInfo {
+  chatroomId: number;
+  member1Id: number;
+  member2Id: number;
+  createdAt: number[];
+  matchingRatio?: number;
+  opponentPostId?: number;
+  opponentPostType?: 'FOUND' | 'LOST';
+  opponentTitle?: string;
+  opponentRegion?: string;
+  opponentDogType?: string;
+  opponentDogColor?: string;
+  opponentTimeAgo?: string;
+  opponentLatitude?: number;
+  opponentLongitude?: number;
+  opponentImage?: string;
+  dogName?: string;
+}
+
+export interface CreateChatRoomResult {
+    chatroomId: number;
+    member1Id?: number;
+    member2Id?: number;
+    createdAt?: number[];
+    matchingRatio?: number;
+    opponentPostId?: number;
+    opponentPostType?: 'FOUND' | 'LOST';
+    opponentTitle?: string;
+    opponentRegion?: string;
+    opponentDogType?: string;
+    opponentDogColor?: string;
+    opponentTimeAgo?: string;
 }
 
 export interface GeocodeResult {
@@ -266,7 +348,7 @@ export interface ChatRoom {
   lastMessage: string;
   lastMessageTime: string;
   unreadCounts: { [memberName: string]: number };
-  chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
+  chatContext: 'match' | 'lostPostReport' | 'foundPostReport';
 }
 
 export interface NavigationTarget {
@@ -287,6 +369,12 @@ export interface ApiNotification {
   navigationTarget: NavigationTarget;
 }
 
+export interface PushNotificationData {
+  type: string;
+  postId?: number;
+  chatroomId?: number;
+}
+
 // =========================================================================
 // 채팅 및 메시지 타입
 // =========================================================================
@@ -305,7 +393,10 @@ export interface ApiChatRoom {
   postType: 'LOST' | 'FOUND';
   postTitle: string;
   postImageUrl: string | null;
-  postRegion: string;
+  postRegion:string;
+  postUserTime?: number[];
+  chatContext?: 'MATCH' | 'NORMAL';
+  status: 'MISSING' | 'SIGHTED' | 'RETURNED';
 }
 
 // GET /api/messages/{chatroomId}
@@ -334,6 +425,9 @@ export interface ChatRoomFromApi {
   postTitle: string;
   postImageUrl: string | null;
   postRegion: string;
+  postTime: number[] | null; // Pass the raw array
+  chatContext?: 'match' | 'lostPostReport' | 'foundPostReport';
+  status: 'MISSING' | 'SIGHTED' | 'RETURNED';
 }
 
 // getMessages가 반환하는 타입

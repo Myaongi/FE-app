@@ -1,7 +1,6 @@
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import React from 'react';
+import React, { useState } from 'react';
 import { 
-  Alert, 
   StyleSheet, 
   Text, 
   TouchableOpacity, 
@@ -12,6 +11,7 @@ import {
 import PostDetailContent from '../components/PostDetailContent';
 import { getPostById } from '../service/mockApi';
 import { Post, AuthStackParamList, StackNavigation } from '../types';
+import LoginRequiredModal from '../components/LoginRequiredModal';
 
 type PostDetailGuestRouteProp = RouteProp<AuthStackParamList, 'PostDetail'>;
 
@@ -20,6 +20,7 @@ const PostDetailGuestScreen = () => {
   const navigation = useNavigation<StackNavigation>();
   const { id, type } = route.params;
   const [post, setPost] = React.useState<Post | null>(null);
+  const [isLoginModalVisible, setIsLoginModalVisible] = useState(false);
 
   React.useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
@@ -36,18 +37,6 @@ const PostDetailGuestScreen = () => {
     fetchPost();
   }, [fetchPost]);
   
-  const requireLoginAlert = () => {
-    Alert.alert(
-      '로그인이 필요합니다',
-      '해당 기능은 로그인이 필요합니다. 로그인 페이지로 이동하시겠습니까?',
-      [
-        { text: '취소', style: 'cancel' },
-        { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
-      ]
-    );
-  };
-
-  
   if (!post) {
     return (
       <View style={styles.loadingContainer}>
@@ -58,7 +47,11 @@ const PostDetailGuestScreen = () => {
 
   return (
     <View style={styles.container}>
-      <PostDetailContent post={post} isGuest={true}>
+      <PostDetailContent 
+        post={post} 
+        isGuest={true}
+        onReportPressForGuest={() => setIsLoginModalVisible(true)}
+      >
         <SafeAreaView style={styles.bottomArea}>
           {post.status === 'RETURNED' ? (
             <View style={[styles.bottomButton, styles.expiredPostContainer]}>
@@ -67,7 +60,7 @@ const PostDetailGuestScreen = () => {
           ) : (
             <TouchableOpacity
               style={styles.bottomButton}
-              onPress={requireLoginAlert}
+              onPress={() => setIsLoginModalVisible(true)}
             >
               <Text style={styles.bottomButtonText}>
                 로그인하고 {post.type === 'lost' ? '발견 정보 남기기' : '채팅하기'}
@@ -76,6 +69,14 @@ const PostDetailGuestScreen = () => {
           )}
         </SafeAreaView>
       </PostDetailContent>
+      <LoginRequiredModal
+        visible={isLoginModalVisible}
+        onClose={() => setIsLoginModalVisible(false)}
+        onConfirm={() => {
+          setIsLoginModalVisible(false);
+          navigation.navigate('LoginScreen');
+        }}
+      />
     </View>
   );
 };

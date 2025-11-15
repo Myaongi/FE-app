@@ -1,25 +1,31 @@
-import { useNavigation, useRoute, RouteProp, useIsFocused } from '@react-navigation/native';
-import React, { useCallback, useState, useEffect } from 'react';
+import { RouteProp, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  SafeAreaView,
-  ActivityIndicator,
 } from 'react-native';
-import { useAuth } from '../hooks/useAuth';
+import DeletePostModal from '../components/DeletePostModal';
 import PostDetailContent from '../components/PostDetailContent';
+import UpdateStatusModal from '../components/UpdateStatusModal';
+import MatchingPostsSelectionModal from '../components/MatchingPostsSelectionModal';
 import WitnessModal from '../components/WitnessModal';
+import UpdateStatusSelectionModal from '../components/UpdateStatusSelectionModal';
+import UpdateStatusSuccessModal from '../components/UpdateStatusSuccessModal'; // Import the new success modal
+import { useAuth } from '../hooks/useAuth';
 import {
-  getPostById,
-  updatePostStatus,
-  deletePost,
   createChatRoom,
   createSightCard,
+  deletePost,
+  getMatchesWithChat,
+  getPostById,
+  updateMultiplePostStatus,
 } from '../service/mockApi';
-import { Post, RootStackParamList, StackNavigation, SightCard } from '../types';
+import { Match, Post, RootStackParamList, StackNavigation } from '../types';
 
 type PostDetailRouteProp = RouteProp<RootStackParamList, 'PostDetail'>;
 
@@ -30,8 +36,24 @@ const PostDetailScreen = () => {
 
   const [post, setPost] = useState<Post | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [isUpdateStatusModalVisible, setUpdateStatusModalVisible] = useState(false);
+  const [isUpdateStatusSelectionModalVisible, setIsUpdateStatusSelectionModalVisible] = useState(false);
+  const [showUpdateStatusSuccessModal, setShowUpdateStatusSuccessModal] = useState(false); // New state for success modal
+  const [matchingPostsWithChat, setMatchingPostsWithChat] = useState<Match[]>([]);
+  const [selectedMatchingPosts, setSelectedMatchingPosts] = useState<number[]>([]); // New state for selected matching posts
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  const handleSelectMatchingPost = (matchingId: number) => {
+    setSelectedMatchingPosts((prevSelected) => {
+      if (prevSelected.includes(matchingId)) {
+        return prevSelected.filter((id) => id !== matchingId);
+      } else {
+        return [...prevSelected, matchingId];
+      }
+    });
+  };
 
   const { isLoggedIn, userMemberName, userMemberId } = useAuth();
   const isFocused = useIsFocused();
@@ -43,10 +65,10 @@ const PostDetailScreen = () => {
       if (fetchedPost) {
         setPost(fetchedPost);
       } else {
-        Alert.alert("오류", "게시글을 불러오는 데 실패했습니다.");
+        Alert.alert('오류', '게시글을 불러오는 데 실패했습니다.');
       }
     } catch (error) {
-      Alert.alert("오류", "게시글을 불러오는 데 실패했습니다.");
+      Alert.alert('오류', '게시글을 불러오는 데 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
@@ -61,18 +83,81 @@ const PostDetailScreen = () => {
 
   const handleCompleteReturn = async () => {
     if (!post) return;
+    // Fetch matching posts when opening the selection modal
+    if (post.type === 'lost') {
+      try {
+        const { matches } = await getMatchesWithChat(post.type, post.id);
+        setMatchingPostsWithChat(matches || []);
+        setSelectedMatchingPosts([]); // Reset selections
+      } catch (error) {
+        console.error('Error fetching matching posts:', error);
+        setMatchingPostsWithChat([]);
+      }
+    } else { // Add this else block for 'found' posts
+      setMatchingPostsWithChat([]); // Clear matching posts for 'found' type
+      setSelectedMatchingPosts([]); // Reset selections
+    }
+    setIsUpdateStatusSelectionModalVisible(true);
+  };
+
+  const handleConfirmStatusUpdateFromSelection = async (selectedIds?: number[]) => {
+    if (!post) return;
+
+    setIsUpdateStatusSelectionModalVisible(false); // Close the selection modal immediately
 
     try {
-      await updatePostStatus(post.id, post.type, 'RETURNED');
-      setPost(prevPost => prevPost ? { ...prevPost, status: 'RETURNED' } : null);
-      Alert.alert('처리 완료', '게시물 상태가 귀가 완료로 변경되었습니다.');
+      // 1. 내 실종 게시글 상태 업데이트
+      await updateMultiplePostStatus(post.type, [Number(post.id)], 'RETURNED');
+
+      // 2. 선택된 발견 게시글들 상태 업데이트 (선택된 게시글이 있을 경우에만)
+      if (selectedIds && selectedIds.length > 0) {
+        await updateMultiplePostStatus('found', selectedIds, 'RETURNED');
+      }
+      
+      setPost((prev) => (prev ? { ...prev, status: 'RETURNED' } : null));
+      setShowUpdateStatusSuccessModal(true); // Show success modal
     } catch (error) {
-      console.error("Failed to update post status:", error);
-      Alert.alert('오류', '상태 변경에 실패했습니다. 다시 시도해주세요.');
+      console.error('Failed to update post status:', error);
+      Alert.alert('오류', '상태 변경 중 오류가 발생했습니다.');
     }
   };
 
-  const navigateToChat = async (context: 'witnessedPostReport' | 'lostPostReport') => {
+  const handleConfirmUpdateStatus = async () => {
+    if (!post) return;
+    try {
+      await updateMultiplePostStatus(post.type, [Number(post.id)], 'RETURNED');
+      setPost((prev) => (prev ? { ...prev, status: 'RETURNED' } : null));
+      setShowUpdateStatusSuccessModal(true); // Show success modal
+    } catch (error) {
+      Alert.alert('오류', '상태 변경 중 오류가 발생했습니다.');
+    } finally {
+      setUpdateStatusModalVisible(false);
+    }
+  };
+
+  // This function is no longer needed as matching post selection is integrated into UpdateStatusSelectionModal
+  // const handleConfirmMatchingPostsUpdate = async (selectedMatchingIds: number[]) => {
+  //   if (!post) return;
+
+  //   try {
+  //     // 1. 내 실종 게시글 상태 업데이트
+  //     await updateMultiplePostStatus('lost', [Number(post.id)], 'RETURNED');
+
+  //     // 2. 선택된 발견 게시글들 상태 업데이트 (선택된 게시글이 있을 경우에만)
+  //     if (selectedMatchingIds.length > 0) {
+  //       await updateMultiplePostStatus('found', selectedMatchingIds, 'RETURNED');
+  //     }
+      
+  //     setPost((prev) => (prev ? { ...prev, status: 'RETURNED' } : null));
+  //     setShowUpdateStatusSuccessModal(true); // Show success modal
+  //   } catch (error) {
+  //     Alert.alert('오류', '상태 변경 중 오류가 발생했습니다.');
+  //   } finally {
+  //     setIsMatchingPostsModalVisible(false);
+  //   }
+  // };
+
+  const navigateToChat = async (context: 'foundPostReport' | 'lostPostReport') => {
     if (!isLoggedIn || !userMemberName || !post || !post.authorId) {
       Alert.alert("오류", "채팅을 시작하기 위한 정보가 부족합니다.");
       return;
@@ -100,6 +185,8 @@ const PostDetailScreen = () => {
         postTitle: post.title,
         postImageUrl: post.photos ? post.photos[0] : null,
         postRegion: post.location,
+        postTime: post.date as number[],
+        status: post.status,
         type: post.type,
         chatContext: context,
       });
@@ -148,6 +235,8 @@ const PostDetailScreen = () => {
         postTitle: post.title,
         postImageUrl: post.photos?.[0] ?? null,
         postRegion: post.location,
+        postTime: post.date as number[],
+        status: post.status,
         type: post.type,
         chatContext: 'lostPostReport',
         sightCard: sightCard,
@@ -171,22 +260,21 @@ const PostDetailScreen = () => {
 
   const handleDelete = () => {
     if (!post) return;
-    Alert.alert('게시글 삭제', '정말 삭제하시겠습니까?', [
-      { text: '취소', style: 'cancel' },
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deletePost(post.id, post.type);
-            Alert.alert('삭제 완료', '게시글이 삭제되었습니다.');
-            navigation.goBack();
-          } catch (error) {
-            Alert.alert('삭제 실패', '게시글 삭제에 실패했습니다.');
-          }
-        },
-      },
-    ]);
+    setDeleteModalVisible(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!post) return;
+    try {
+      await deletePost(post.id, post.type);
+      setDeleteModalVisible(false);
+      Alert.alert('삭제 완료', '게시글이 삭제되었습니다.', [
+        { text: '확인', onPress: () => navigation.goBack() },
+      ]);
+    } catch (error) {
+      setDeleteModalVisible(false);
+      Alert.alert('삭제 실패', '게시글 삭제에 실패했습니다.');
+    }
   };
 
 
@@ -202,8 +290,42 @@ const PostDetailScreen = () => {
   ? Number(post.authorId) === userMemberId
   : false;
 
+  console.log('PostDetailScreen - post.type:', post.type);
+  console.log('PostDetailScreen - hasMatchingPosts prop:', post.type === 'lost' && matchingPostsWithChat.length > 0);
+
   return (
     <View style={styles.container}>
+      <DeletePostModal
+        visible={isDeleteModalVisible}
+        onClose={() => setDeleteModalVisible(false)}
+        onConfirm={handleConfirmDelete}
+      />
+      <UpdateStatusModal
+        visible={isUpdateStatusModalVisible}
+        onClose={() => setUpdateStatusModalVisible(false)}
+        onConfirm={handleConfirmUpdateStatus}
+      />
+      {/* MatchingPostsSelectionModal is no longer needed here */}
+      {/* <MatchingPostsSelectionModal
+        visible={isMatchingPostsModalVisible}
+        onClose={() => setIsMatchingPostsModalVisible(false)}
+        onConfirm={handleConfirmMatchingPostsUpdate}
+        matchingPosts={matchingPostsWithChat}
+      /> */}
+      {post && (
+        <UpdateStatusSelectionModal
+          key={isUpdateStatusSelectionModalVisible ? 'visible' : 'hidden'} // Add key prop
+          visible={isUpdateStatusSelectionModalVisible}
+          onClose={() => setIsUpdateStatusSelectionModalVisible(false)}
+          onConfirm={handleConfirmStatusUpdateFromSelection} // Use the new handler
+          post={post}
+          matchingPosts={matchingPostsWithChat} // Pass matching posts
+          onSelectMatchingPost={handleSelectMatchingPost} // Pass selection handler
+          selectedMatchingPosts={selectedMatchingPosts} // Pass selected posts
+          hasMatchingPosts={post.type === 'lost' && matchingPostsWithChat.length > 0} // Indicate if there are matching posts
+        />
+      )}
+
       <PostDetailContent 
         post={post} 
         isMyPost={isMyPost} 
@@ -224,7 +346,7 @@ const PostDetailScreen = () => {
               if (post.type === 'lost') {
                  setIsModalVisible(true);
               } else {
-                await navigateToChat('witnessedPostReport');
+                await navigateToChat('foundPostReport');
               }
             }}>
               <Text style={styles.bottomButtonText}>
@@ -242,6 +364,14 @@ const PostDetailScreen = () => {
       </PostDetailContent>
 
       <WitnessModal visible={isModalVisible} onClose={() => setIsModalVisible(false)} onSubmit={handleWitnessSubmit} />
+      
+      <UpdateStatusSuccessModal // Render the success modal
+        visible={showUpdateStatusSuccessModal}
+        onClose={() => {
+          setShowUpdateStatusSuccessModal(false);
+          fetchPost(); // Refresh post data after status update
+        }}
+      />
     </View>
   );
 };

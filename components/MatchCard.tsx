@@ -1,20 +1,23 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import BackIcon from '../assets/images/back.svg'; 
-import { formatDisplayDate } from '../utils/time';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import PuppyIcon from '../assets/images/puppy.svg';
+import FootIcon from '../assets/images/foot.svg';
+import BackIcon from '../assets/images/back.svg';
+import DeleteMatchModal from './DeleteMatchModal';
 
 interface MatchCardProps {
   title: string;
   species: string;
   color: string;
   location: string;
-  date: string;
+  timeAgo: string;
   similarity: number;
+  image: string;
   onDelete: () => void;
   onChat: () => void;
-  status: '실종' | '발견' | '귀가 완료'; 
+  status: '실종' | '발견' | '귀가 완료';
   onPressInfo: () => void;
-  userPostType: 'lost' | 'witnessed';
+  userPostType: 'lost' | 'found';
   userPetName?: string;
 }
 
@@ -30,197 +33,241 @@ const MatchCard: React.FC<MatchCardProps> = ({
   species,
   color,
   location,
-  date,
+  timeAgo,
   similarity,
+  image,
   onDelete,
   onChat,
-  status,
   onPressInfo,
   userPostType,
   userPetName,
+  status,
 }) => {
-  const truncatedTitle = truncateText(title, 20);
+  const truncatedTitle = truncateText(title, 17);
+  const [modalVisible, setModalVisible] = useState(false);
 
-  const dynamicHeader = userPostType === 'lost'
-    ? `실종된 ${userPetName || '반려동물'}와 비슷한 강아지를 발견했어요`
-    : '당신이 발견한 강아지, 혹시 이 아이일까요?';
+  const handleDeletePress = () => {
+    setModalVisible(true);
+  };
+
+  const handleConfirmDelete = () => {
+    onDelete();
+    setModalVisible(false);
+  };
+
+  const caseText = userPostType === 'lost'
+    ? `실종된 ${userPetName || '당신의 반려동물'}와(과) 비슷한 강아지를 발견했어요`
+    : '당신이 목격한 강아지, 혹시 이 아이일까요?';
+
+  const foundColor = '#FEF3B1';
+  const lostColor = '#FFDBE3';
+  const dynamicColor = status === '발견' ? foundColor : lostColor;
 
   return (
-    <View style={styles.cardContainer}>
-      <View style={styles.dynamicHeaderContainer}>
-        <Text style={styles.dynamicHeaderText}>{dynamicHeader}</Text>
-      </View>
-      <View style={styles.topSection}>
-        <View style={styles.imagePlaceholder} />
-        <TouchableOpacity style={styles.infoSection} onPress={onPressInfo}>
-          <View style={styles.titleAndStatus}>
-            <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
-              {truncatedTitle}
-            </Text>
-            <View style={styles.similarityAndStatusColumnContainer}>
-              <View style={styles.similarityBadge}>
-                <Text style={styles.similarityText}>{similarity}% 일치</Text>
-              </View>
-              <View style={styles.statusBadgeAdjusted}>
-                <Text style={styles.statusText}>{status}</Text>
-              </View>
-              <View style={styles.viewDetailsButtonAdjusted}>
-                <BackIcon width={20} height={20} style={styles.viewDetailsIcon} />
+    <>
+      <DeleteMatchModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onConfirm={handleConfirmDelete}
+      />
+      <View style={styles.shadowContainer}>
+        <View style={[styles.cardContainer, { borderColor: dynamicColor }]}>
+          <View style={[styles.topSection, { backgroundColor: dynamicColor }]}>
+            <View style={styles.header}>
+              <Text style={styles.headerText}>{caseText}</Text>
+              <View style={styles.similarityContainer}>
+                <Text style={styles.similarityText}>{Math.floor(similarity)}% 일치</Text>
               </View>
             </View>
           </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>색상 </Text>
-            <Text style={styles.infoValue}>{color}</Text>
-            <Text style={styles.infoLabel}>종 </Text>
-            <Text style={styles.infoValue}>{species}</Text>
+
+          <View style={styles.middleBottomSection}>
+            <TouchableOpacity onPress={onPressInfo} style={styles.touchableContent}>
+              <View style={styles.postContentWrapper}>
+                <View style={styles.bodyContainer}>
+                  {image ? (
+                    <Image source={{ uri: image }} style={[styles.image, { borderColor: dynamicColor }]} />
+                  ) : (
+                    <View style={[styles.imagePlaceholder, { borderColor: dynamicColor }]} />
+                  )}
+                  <View style={styles.contentContainer}>
+                    <Text style={styles.title}>{truncatedTitle}</Text>
+                    <View style={styles.infoRow}>
+                      <PuppyIcon width={16} height={16} style={styles.icon} color="#424242" />
+                      <Text style={styles.infoText}>{species}</Text>
+                      <Text style={styles.separator}>|</Text>
+                      <Text style={styles.infoText}>{color}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <FootIcon width={16} height={16} style={styles.icon} color="#424242" />
+                      <Text style={styles.infoText}>{location}</Text>
+                      {timeAgo && (
+                        <>
+                          <Text style={styles.separator}>|</Text>
+                          <Text style={styles.infoText}>{timeAgo}</Text>
+                        </>
+                      )}
+                    </View>
+                  </View>
+                </View>
+                <BackIcon width={20} height={20} style={styles.viewDetailsIcon} />
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.bottomButtons}>
+              <TouchableOpacity style={styles.deleteButton} onPress={handleDeletePress}>
+                <Text style={styles.deleteButtonText}>추천에서 삭제</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.chatButton} onPress={onChat}>
+                <Text style={styles.chatButtonText}>1:1 채팅하기</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <Text style={styles.infoText}>{location}</Text>
-          <Text style={styles.infoText}>{formatDisplayDate(date)}</Text>
-        </TouchableOpacity>
+        </View>
       </View>
-      <View style={styles.bottomButtons}>
-        <TouchableOpacity style={styles.deleteButton} onPress={onDelete}>
-          <Text style={styles.deleteButtonText}>추천에서 삭제</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.chatButton} onPress={onChat}>
-          <Text style={styles.chatButtonText}>1:1 채팅하기</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
-  cardContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    shadowColor: '#000',
+  shadowContainer: {
+    shadowColor: 'rgba(0, 0, 0, 0.25)',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    padding: 12,
-    marginBottom: 16,
-    marginHorizontal: 16,
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 5,
+    marginBottom: 6,
+    marginHorizontal: 8,
+    opacity: 1,
   },
-  dynamicHeaderContainer: {
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  dynamicHeaderText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#555',
-    textAlign: 'center',
+  cardContainer: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 2,
   },
   topSection: {
-    flexDirection: 'row',
-    marginBottom: 16,
+    padding: 12,
   },
-  imagePlaceholder: {
-    top : 35,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+  },
+  similarityContainer: {
+    borderRadius: 20642200,
+    backgroundColor: '#CDECFF',
+    shadowColor: 'rgba(0, 0, 0, 0.10)',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 3,
+    elevation: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  similarityText: {
+    color: '#0072B1',
+    textAlign: 'center',
+    fontSize: 10,
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  middleBottomSection: {
+    backgroundColor: 'rgba(255, 255, 255, 0.54)',
+    padding: 12,
+  },
+  touchableContent: {
+  },
+  postContentWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  bodyContainer: {
+    flexDirection: 'row',
+    flex: 1, 
+  },
+  image: {
     width: 90,
     height: 90,
     backgroundColor: '#e0e0e0',
-    borderRadius: 8,
-    marginRight: 12,
+    borderRadius: 10,
+    borderWidth: 2,
+
   },
-  infoSection: {
+  imagePlaceholder: {
+    width: 90,
+    height: 90,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 10,
+    borderWidth: 2,
+  },
+  contentContainer: {
     flex: 1,
-  },
-  titleAndStatus: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center', 
-    marginBottom: 1,
+    marginLeft: 12,
+    justifyContent: 'center',
   },
   title: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
-    flexShrink: 1,
-    marginRight: 10,
-  },
-  similarityAndStatusColumnContainer: {
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-  },
-  similarityBadge: {
-    backgroundColor: '#f0f0f0',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-  },
-  similarityText: {
-    fontSize: 12,
-    color: '#333',
-    fontWeight: 'bold',
-  },
-  statusBadgeAdjusted: {
-    backgroundColor: '#f0f0f0',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    marginTop: 4,
-  },
-  statusText: {
-    fontSize: 12,
-    color: '#333',
-    fontWeight: 'bold',
-  },
-  viewDetailsButtonAdjusted: {
-    marginTop: 4,
-    padding: 4,
-  },
-  viewDetailsIcon: {
-    transform: [{ rotate: '180deg' }],
-    color: '#888',
+    marginBottom: 18,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 4,
   },
-  infoLabel: {
-    fontSize: 12,
-    color: '#888',
-  },
-  infoValue: {
-    fontSize: 12,
-    color: '#333',
-    marginRight: 8,
+  icon: {
+    marginRight: 6,
   },
   infoText: {
     fontSize: 12,
     color: '#333',
-    marginBottom: 2,
+  },
+  separator: {
+    marginHorizontal: 6,
+    color: '#ccc',
+  },
+  viewDetailsIcon: {
+    transform: [{ rotate: '180deg' }],
+    color: '#888',
+    marginLeft: 10,
   },
   bottomButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingTop: 12,
   },
   deleteButton: {
-    backgroundColor: '#f0f0f0',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    width: 170,
+    height: 40,
     borderRadius: 20,
-    flex: 1,
+    borderWidth: 1,
+    borderColor: '#8ED7FF',
+    backgroundColor: '#FFF',
     marginRight: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   deleteButtonText: {
     fontSize: 14,
-    color: '#888',
+    color: '#8ED7FF',
     fontWeight: '500',
   },
   chatButton: {
-    backgroundColor: '#FF8C00',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    width: 170,
+    height: 40,
     borderRadius: 20,
-    flex: 1,
+    backgroundColor: '#48BEFF',
     marginLeft: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   chatButtonText: {
     fontSize: 14,

@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, TouchableWithoutFeedba
 interface WritePostModalProps {
   visible: boolean;
   onClose: () => void;
-  onSelectOption: (option: 'lost' | 'witnessed') => void; 
+  onSelectOption: (option: 'lost' | 'found') => void;
 }
 
 const WritePostModal: React.FC<WritePostModalProps> = ({ visible, onClose, onSelectOption }) => {
@@ -20,7 +20,7 @@ const WritePostModal: React.FC<WritePostModalProps> = ({ visible, onClose, onSel
           <View style={styles.modalView}>
             <TouchableOpacity 
               style={styles.button}
-              onPress={() => onSelectOption('witnessed')} 
+              onPress={() => onSelectOption('found')} 
             >
               <Text style={styles.buttonText}>발견했어요</Text>
             </TouchableOpacity>

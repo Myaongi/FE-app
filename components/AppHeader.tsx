@@ -4,7 +4,7 @@ import { useBadge } from '../contexts/BadgeContext';
 
 import FilterIcon from '../assets/images/filter.svg';
 import AlarmIcon from '../assets/images/alram.svg';
-import LogoIcon from '../assets/images/logo.svg'; 
+import LoginLogo from '../assets/images/loginlogo.svg';
 
 interface AppHeaderProps {
   showFilter?: boolean;
@@ -18,8 +18,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ showFilter = true, onAlarmPress, 
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
-        <LogoIcon width={24} height={24} />
-        <Text style={styles.appName}>강아지킴이</Text>
+        <LoginLogo width={130} height={22} />
       </View>
       <View style={styles.iconsContainer}>
  
@@ -51,7 +50,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingLeft: 21,
+    paddingRight: 16,
     paddingVertical: 12,
     backgroundColor: 'transparent',
   },
@@ -59,17 +59,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  appName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginLeft: 8,
-    color: '#000000',
-  },
   iconsContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
   },
   iconButton: {
-    marginLeft: 10,
     padding: 4,
   },
   badgeContainer: {

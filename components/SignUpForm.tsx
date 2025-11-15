@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import BackIcon from '../assets/images/back.svg';
+import EmIcon from './icons/EmIcon';
+import LogoIcon from './icons/LogoIcon';
+import PwIcon from './icons/PwIcon';
 
 interface SignUpFormProps {
   step: number;
@@ -36,6 +39,12 @@ const SignUpForm = ({
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
+  const [memberNameFocused, setMemberNameFocused] = useState(false);
+
+  const isEmailActive = emailFocused || email.trim() !== '';
+  const isPasswordActive = passwordFocused || password.trim() !== '';
+  const isConfirmPasswordActive = confirmPasswordFocused || confirmPassword.trim() !== '';
+  const isMemberNameActive = memberNameFocused || memberName.trim() !== '';
   
   const isButtonDisabled = () => {
     switch (step) {
@@ -50,20 +59,46 @@ const SignUpForm = ({
     }
   };
 
-
-  const renderStepContent = () => {
+  const getPromptText = () => {
     switch (step) {
       case 1:
-        return (
+        return '이메일로 시작하기';
+      case 2:
+        return '비밀번호 설정';
+      case 3:
+        return '닉네임 설정';
+      default:
+        return '';
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <View>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            onPress={step === 1 ? onClose : onBack} 
+            style={styles.backButton}
+          >
+            <BackIcon width={24} height={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.logo}>회원가입</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.headerSeparator} />
+      </View>
+
+      <ScrollView style={styles.formContent}>
+        <Text style={styles.promptText}>{getPromptText()}</Text>
+
+        {step < 3 ? (
           <>
-            <Text style={styles.promptText}>이메일로 시작하기</Text>
             <View style={styles.inputContainer}>
-              <Image 
-                source={(emailFocused || email.trim()) ? require('../assets/images/emon.png') : require('../assets/images/em.png')} 
-                style={styles.inputIcon} 
-              />
+              <View style={styles.inputIcon}>
+                <EmIcon color={isEmailActive ? '#48BEFF' : '#D6D6D6'} />
+              </View>
               <TextInput
-                style={styles.input}
+                style={[styles.input, step > 1 && styles.inputDisabled]}
                 placeholder="이메일"
                 placeholderTextColor="#B0B0B0"
                 keyboardType="email-address"
@@ -72,90 +107,73 @@ const SignUpForm = ({
                 onChangeText={setEmail}
                 onFocus={() => setEmailFocused(true)}
                 onBlur={() => setEmailFocused(false)}
+                editable={step === 1}
               />
             </View>
+
+            {step === 2 && (
+              <>
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputIcon}>
+                    <PwIcon color={isPasswordActive ? '#48BEFF' : '#D6D6D6'} />
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="비밀번호"
+                    placeholderTextColor="#B0B0B0"
+                    secureTextEntry
+                    value={password}
+                    onChangeText={setPassword}
+                    onFocus={() => setPasswordFocused(true)}
+                    onBlur={() => setPasswordFocused(false)}
+                  />
+                </View>
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputIcon}>
+                    <PwIcon color={isConfirmPasswordActive ? '#48BEFF' : '#D6D6D6'} />
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="비밀번호 확인"
+                    placeholderTextColor="#B0B0B0"
+                    secureTextEntry
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    onFocus={() => setConfirmPasswordFocused(true)}
+                    onBlur={() => setConfirmPasswordFocused(false)}
+                  />
+                </View>
+                <Text style={styles.passwordHelpText}>
+                  비밀번호는 8~20자이며, {`\n`}영문, 숫자, 특수문자 중 3가지 이상을 포함해야 합니다.
+                </Text>
+              </>
+            )}
           </>
-        );
-      case 2:
-        return (
-          <>
-            <Text style={styles.promptText}>비밀번호 설정</Text>
-            <View style={styles.inputContainer}>
-              <Image 
-                source={(passwordFocused || password.trim()) ? require('../assets/images/pwon.png') : require('../assets/images/pw.png')} 
-                style={styles.inputIcon} 
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="비밀번호"
-                placeholderTextColor="#B0B0B0"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-                onFocus={() => setPasswordFocused(true)}
-                onBlur={() => setPasswordFocused(false)}
-              />
+        ) : (
+          <View style={styles.inputContainer}>
+            <View style={styles.inputIcon}>
+              <LogoIcon color={isMemberNameActive ? '#48BEFF' : '#D9D9D9'} />
             </View>
-            <View style={styles.inputContainer}>
-              <Image 
-                source={(confirmPasswordFocused || confirmPassword.trim()) ? require('../assets/images/pwon.png') : require('../assets/images/pw.png')} 
-                style={styles.inputIcon} 
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="비밀번호 확인"
-                placeholderTextColor="#B0B0B0"
-                secureTextEntry
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                onFocus={() => setConfirmPasswordFocused(true)}
-                onBlur={() => setConfirmPasswordFocused(false)}
-              />
-            </View>
-          </>
-        );
-      case 3:
-        return (
-          <>
-            <Text style={styles.promptText}>닉네임 설정</Text>
             <TextInput
-              style={styles.inputOnly}
+              style={styles.input}
               placeholder="닉네임"
               placeholderTextColor="#B0B0B0"
               value={memberName}
               onChangeText={setMemberName}
+              onFocus={() => setMemberNameFocused(true)}
+              onBlur={() => setMemberNameFocused(false)}
             />
-          </>
-        );
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={step === 1 ? onClose : onBack} 
-          style={styles.backButton}
+          </View>
+        )}
+        
+        <TouchableOpacity
+          style={[styles.button, isButtonDisabled() && styles.buttonDisabled]}
+          onPress={step < 3 ? onNext : onSignUp}
+          disabled={isButtonDisabled()}
         >
-          <BackIcon width={24} height={24} color="#333" />
+          <Text style={styles.buttonText}>{step < 3 ? '다음' : '회원가입'}</Text>
         </TouchableOpacity>
-        <Text style={styles.logo}>회원가입</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
-      <View style={styles.formContent}>
-        {renderStepContent()}
-      </View>
-
-      <TouchableOpacity
-        style={[styles.button, isButtonDisabled() && styles.buttonDisabled]}
-        onPress={step < 3 ? onNext : onSignUp}
-        disabled={isButtonDisabled()}
-      >
-        <Text style={styles.buttonText}>{step < 3 ? '다음' : '회원가입'}</Text>
-      </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 };
@@ -164,32 +182,47 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     width: '100%',
-    paddingHorizontal: 20,
-    justifyContent: 'space-between',
+    backgroundColor: '#FFFEF5',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  headerSeparator: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#D9D9D9',
+    ...Platform.select({
+      ios: {
+        shadowColor: 'rgba(0, 0, 0, 0.25)',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 1,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   backButton: {
     padding: 8,
   },
   logo: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
   },
   formContent: {
     flex: 1,
     width: '100%',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
+    padding: 20,
+    paddingTop: 40,
   },
   promptText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 20,
+    color: '#000',
     marginBottom: 20,
     fontWeight: 'bold',
   },
@@ -204,18 +237,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     marginBottom: 10,
   },
-  inputContainerError: { // 🚨 더 이상 사용되지 않음
-    borderBottomColor: 'red',
-  },
   inputIcon: {
     width: 20,
     height: 20,
     marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   input: {
     flex: 1,
     fontSize: 16,
     paddingVertical: 0,
+  },
+  inputDisabled: {
+    color: '#B0B0B0',
   },
   inputOnly: {
     width: '100%',
@@ -227,22 +262,33 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     fontSize: 16,
   },
-  inputError: { // 🚨 더 이상 사용되지 않음
-    borderBottomColor: 'red',
-  },
-  errorText: { // 🚨 더 이상 사용되지 않음
-    color: 'red',
+  passwordHelpText: {
+    color: '#48BEFF',
     fontSize: 14,
-    marginBottom: 10,
+    fontWeight: 500,
+    marginTop: 8,
+    lineHeight: 18,
   },
   button: {
     width: '100%',
     height: 50,
-    backgroundColor: '#6A5ACD',
-    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    alignSelf: 'center',
+    marginTop: 40,
+    borderRadius: 18,
+    backgroundColor: '#48BEFF',
+    ...Platform.select({
+      ios: {
+        shadowColor: 'rgba(0, 0, 0, 0.25)',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 1,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   buttonText: {
     color: '#fff',
@@ -251,6 +297,14 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     backgroundColor: '#ccc',
+    ...Platform.select({
+      ios: {
+        shadowOpacity: 0,
+      },
+      android: {
+        elevation: 0,
+      },
+    }),
   },
 });
 

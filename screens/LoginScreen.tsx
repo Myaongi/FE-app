@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import React, { useContext, useLayoutEffect, useState } from 'react';
 import { 
@@ -6,7 +5,8 @@ import {
   KeyboardAvoidingView, 
   Platform, 
   SafeAreaView, 
-  StyleSheet 
+  StyleSheet, 
+  View
 } from 'react-native';
 import { AuthContext, navigationRef } from '../App'; 
 import LoginForm from '../components/LoginForm';
@@ -21,16 +21,16 @@ const LoginScreen = () => {
   
   const authContext = useContext(AuthContext);
 
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: false });
+  }, [navigation]);
+
   if (!authContext) {
     Alert.alert("오류", "AuthContext를 사용할 수 없습니다. 앱을 재시작해주세요.");
     return null; 
   }
 
   const { signIn } = authContext;
-
-  useLayoutEffect(() => {
-    navigation.setOptions({ headerShown: false });
-  }, [navigation]);
 
   const isValidEmail = (email: string) => {
     const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
@@ -100,6 +100,7 @@ const LoginScreen = () => {
           style={styles.keyboardView}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
+        <View style={styles.formContainer}>
           <LoginForm
               email={email}
               setEmail={setEmail}
@@ -109,6 +110,7 @@ const LoginScreen = () => {
               onSignUp={handleSignUp}
               onGoBackToGuest={handleGoBackToGuest}
           />
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -117,12 +119,21 @@ const LoginScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#FEF3B1',
   },
   keyboardView: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  formContainer: {
+    width: '100%',
+    flex: 1,
+    marginTop: 60,
+    marginBottom: 73,
+    backgroundColor: '#FFFEF5',
+    borderRadius: 28,
+    justifyContent: 'center',
   },
 });
 

@@ -7,12 +7,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AppState } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {
-  getNewMatchCount,
   getUserProfile,
   saveUserLocation,
   savePushToken,
 } from './service/mockApi';
 import { deactivateClient } from './service/stompClient';
+
+// Components
+import AnimatedSplashScreen from './components/AnimatedSplashScreen';
 
 // Contexts
 import { BadgeProvider, useBadge } from './contexts/BadgeContext';
@@ -77,31 +79,16 @@ Notifications.setNotificationHandler({
 });
 
 function RootTabNavigator() {
-  const [matchCount, setMatchCount] = useState(0);
-  const { unreadChatCount } = useBadge(); 
-  const { isLoggedIn, userMemberId } = React.useContext(AuthContext);
-
-  const fetchMatchCount = async () => {
-    if (!isLoggedIn || !userMemberId) return;
-    try {
-      const newMatches = await getNewMatchCount();
-      setMatchCount(newMatches);
-    } catch (error) {
-      console.error("Failed to fetch match count:", error);
-    }
-  };
-
-  useEffect(() => {
-    if (isLoggedIn) {
-      fetchMatchCount();
-    }
-  }, [isLoggedIn, userMemberId]);
+  const { unreadChatCount, newMatchCount } = useBadge(); 
 
   return (
     <Tab.Navigator 
       screenOptions={{
         headerShown: false, 
         tabBarActiveTintColor: '#333', 
+        tabBarLabelStyle: { 
+          fontSize: 11,
+        },
         tabBarStyle: { 
           height: 100, 
           paddingBottom: 10,
@@ -137,7 +124,7 @@ function RootTabNavigator() {
           title: '매칭',
           tabBarIcon: ({ focused, color }) => 
             focused ? <MatchOnIcon color={color} /> : <MatchOffIcon color={color} />,
-          tabBarBadge: matchCount > 0 ? matchCount : undefined
+          tabBarBadge: newMatchCount > 0 ? newMatchCount : undefined
         }} 
       />
       <Tab.Screen 
@@ -256,17 +243,12 @@ export default function App() {
   }, [signOut]);
 
   useEffect(() => {
-
     const bootstrapAsync = async () => {
       try {
         const token = await AsyncStorage.getItem('accessToken');
         const memberName = await AsyncStorage.getItem('userMemberName');
         const memberIdString = await AsyncStorage.getItem('userMemberId'); 
         
-        console.log('DEBUG: App.tsx - Retrieved token:', token);
-        console.log('DEBUG: App.tsx - Retrieved memberName:', memberName);
-        console.log('DEBUG: App.tsx - Retrieved memberIdString:', memberIdString);
-
         if (token && memberName && memberIdString) {
           const memberId = Number(memberIdString);
           setIsLoggedIn(true);
@@ -284,8 +266,9 @@ export default function App() {
       } catch (e) {
         console.error('자동 로그인 실패', e);
         await signOut();
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     bootstrapAsync();
@@ -372,12 +355,14 @@ export default function App() {
   }
 
   return (
-    <AuthContext.Provider value={authContext}>
-      <BadgeProvider>
-        <NavigationContainer ref={navigationRef}>
-          {isLoggedIn ? <MainAppStackScreen /> : <AuthStackScreen />}
-        </NavigationContainer>
-      </BadgeProvider>
-    </AuthContext.Provider>
+    <AnimatedSplashScreen>
+      <AuthContext.Provider value={authContext}>
+        <BadgeProvider>
+          <NavigationContainer ref={navigationRef}>
+            {isLoggedIn ? <MainAppStackScreen /> : <AuthStackScreen />}
+          </NavigationContainer>
+        </BadgeProvider>
+      </AuthContext.Provider>
+    </AnimatedSplashScreen>
   );
 }

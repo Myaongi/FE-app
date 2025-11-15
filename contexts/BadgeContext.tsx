@@ -1,6 +1,6 @@
 import React, { createContext, useState, useCallback, useContext, useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { getMyChatRooms, getNotifications, markNotificationAsRead } from '../service/mockApi';
+import { getMyChatRooms, getNewMatchCount, getNotifications, getTotalMatchCount, markNotificationAsRead } from '../service/mockApi';
 import { ApiNotification, ChatRoomFromApi } from '../types';
 import { useAuth } from '../hooks/useAuth';
 
@@ -11,9 +11,12 @@ interface BadgeContextType {
   // Notification
   newNotificationCount: number;
   notifications: ApiNotification[];
+  // Match
+  newMatchCount: number;
   // Common
   fetchChatData: () => Promise<void>;
   fetchNotificationData: () => Promise<void>;
+  fetchMatchData: () => Promise<void>;
   markAsRead: (notificationId: number) => Promise<void>;
   isLoading: boolean;
 }
@@ -21,7 +24,7 @@ interface BadgeContextType {
 const BadgeContext = createContext<BadgeContextType | undefined>(undefined);
 
 export const BadgeProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, userMemberId } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   // Chat state
@@ -31,6 +34,9 @@ export const BadgeProvider: React.FC<{children: React.ReactNode}> = ({ children 
   // Notification state
   const [newNotificationCount, setNewNotificationCount] = useState(0);
   const [notifications, setNotifications] = useState<ApiNotification[]>([]);
+
+  // Match state
+  const [newMatchCount, setNewMatchCount] = useState(0);
 
   // Polling interval ref
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -73,6 +79,17 @@ export const BadgeProvider: React.FC<{children: React.ReactNode}> = ({ children 
     }
   }, []);
 
+  const fetchMatchData = useCallback(async () => {
+    if (!userMemberId) return;
+    try {
+      const count = await getTotalMatchCount(userMemberId);
+      setNewMatchCount(count);
+    } catch (error) {
+      console.error("Failed to fetch match count:", error);
+      setNewMatchCount(0);
+    }
+  }, [userMemberId]);
+
   const fetchAllData = useCallback(async () => {
     if(!isLoggedIn) return;
     setIsLoading(true);
@@ -80,11 +97,12 @@ export const BadgeProvider: React.FC<{children: React.ReactNode}> = ({ children 
       await Promise.all([
         fetchChatData(),
         fetchNotificationData(),
+        fetchMatchData(),
       ]);
     } finally {
       setIsLoading(false);
     }
-  }, [isLoggedIn, fetchChatData, fetchNotificationData]);
+  }, [isLoggedIn, fetchChatData, fetchNotificationData, fetchMatchData]);
 
 
   const markAsRead = useCallback(async (notificationId: number) => {
@@ -135,6 +153,7 @@ export const BadgeProvider: React.FC<{children: React.ReactNode}> = ({ children 
       setUnreadChatCount(0);
       setNotifications([]);
       setNewNotificationCount(0);
+      setNewMatchCount(0); // Reset match count on logout
     }
 
     return () => {
@@ -148,8 +167,10 @@ export const BadgeProvider: React.FC<{children: React.ReactNode}> = ({ children 
     chatList,
     newNotificationCount,
     notifications,
+    newMatchCount,
     fetchChatData,
     fetchNotificationData,
+    fetchMatchData,
     markAsRead,
     isLoading,
   };

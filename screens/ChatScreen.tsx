@@ -1,7 +1,7 @@
 import { useFocusEffect, useNavigation, type NavigationProp } from '@react-navigation/native';
 import React from 'react';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, View, Text, ActivityIndicator } from 'react-native';
-import AppHeader from '../components/AppHeader';
+import LinearGradient from 'react-native-linear-gradient';
 import ChatItem, { ChatData } from '../components/ChatItem';
 import { useBadge } from '../contexts/BadgeContext';
 import { useAuth } from '../hooks/useAuth';
@@ -27,19 +27,14 @@ const ChatScreen = () => {
       return;
     }
 
-    const chatContext = chatItem.postType === 'LOST' ? 'lostPostReport' : 'witnessedPostReport';
+    console.log('chatItem.chatContext from ChatScreen:', chatItem.chatContext);
 
+    // `ChatDetailScreen`에 필요한 파라미터를 명시적으로 전달합니다.
+    // 이렇게 하면 불필요한 파라미터로 인해 예기치 않은 동작(예: 헤더 타이틀 변경)이 발생하는 것을 방지합니다.
     navigation.navigate('ChatDetail', {
       ...chatItem,
-      chatRoomId: chatItem.id,
-      postId: chatItem.postId.toString(),
-      type: chatItem.postType === 'LOST' ? 'lost' : 'witnessed',
-      chatContext: chatContext, 
+      type: chatItem.postType === 'LOST' ? 'lost' : 'found',
     });
-  };
-
-  const handleAlarmPress = () => {
-    navigation.navigate('NotificationsScreen');
   };
 
   const renderContent = () => {
@@ -58,8 +53,10 @@ const ChatScreen = () => {
       title: chat.postTitle,
       lastMessage: chat.lastMessage,
       postType: chat.postType,
+      status: chat.status,
       unreadCount: chat.unreadCount,
       postImageUrl: chat.postImageUrl,
+      postDate: chat.postTime ?? undefined, // postTime을 postDate에 매핑
     }));
 
     return (
@@ -76,19 +73,26 @@ const ChatScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <AppHeader showFilter={false} onAlarmPress={handleAlarmPress} />
-      <View style={styles.listWrapper}>
-        {renderContent()}
-      </View>
-    </SafeAreaView>
+    <LinearGradient
+      colors={['#FEFCE8', '#EFF6FF', '#F0F9FF']}
+      style={{flex: 1}}
+    >
+      <SafeAreaView style={styles.safeArea}>
+                <View style={styles.header}>
+          <Text style={styles.headerTitle}>채팅</Text>
+        </View>
+        <View style={styles.listWrapper}>
+          {renderContent()}
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
     flexDirection: 'column',
   },
   listWrapper: {
@@ -101,6 +105,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  header: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 0.8,
+    borderBottomColor: '#D6D6D6',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 600,
+    color: '#000',
   }
 });
 

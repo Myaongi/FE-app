@@ -14,6 +14,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { AuthContext } from '../App';
 import AppHeader from '../components/AppHeader'; 
+import LogoutModal from '../components/LogoutModal';
 import PostCard from '../components/PostCard';
 import TopTabs from '../components/TopTabs';
 import { getMyPosts } from '../service/mockApi';
@@ -28,12 +29,13 @@ const MypageScreen = () => {
   const { isLoggedIn, userProfile, signOut } = authContext || {};
   const isFocused = useIsFocused();
 
-  const [activeTab, setActiveTab] = useState<'lost' | 'witnessed'>('witnessed');
+  const [activeTab, setActiveTab] = useState<'lost' | 'found'>('found');
   const [posts, setPosts] = useState<Post[]>([]);
   const [page, setPage] = useState(0);
   const [hasNext, setHasNext] = useState(true);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [isLogoutModalVisible, setLogoutModalVisible] = useState(false);
 
   const loadMyPosts = async (isRefresh = false) => {
     if (!isLoggedIn || (loading && !isRefresh)) return;
@@ -44,7 +46,7 @@ const MypageScreen = () => {
     setLoading(true);
 
     try {
-      const typeForApi = activeTab === 'witnessed' ? 'found' : 'lost';
+      const typeForApi = activeTab === 'found' ? 'found' : 'lost';
       const { posts: newPosts, hasNext: newHasNext } = await getMyPosts(typeForApi, currentPage);
       
       if (isRefresh) {
@@ -85,10 +87,12 @@ const MypageScreen = () => {
   };
 
   const handleLogout = () => {
-    Alert.alert('로그아웃', '정말 로그아웃 하시겠습니까?', [
-      { text: '취소', style: 'cancel' },
-      { text: '로그아웃', style: 'destructive', onPress: () => signOut && signOut() },
-    ]);
+    setLogoutModalVisible(true);
+  };
+
+  const confirmLogout = () => {
+    setLogoutModalVisible(false);
+    signOut && signOut();
   };
 
   if (!isLoggedIn) {
@@ -137,21 +141,19 @@ const MypageScreen = () => {
         </View>
 
         <View style={styles.listHeaderContainer}>
-          <View style={styles.welcomeCardWrapper}>
-            <View style={styles.welcomeCard}>
-              <Logo width={24} height={24} />
-              <Text style={styles.welcomeText}>
-                <Text style={styles.userName}>{userProfile?.username || '사용자'}</Text>님 안녕하세요!
-              </Text>
+            <View style={styles.welcomeCardWrapper}>
+                <View style={styles.welcomeCard}>
+                    <View style={styles.welcomeMessage}>
+                        <Logo width={24} height={24} />
+                        <Text style={styles.welcomeText}>
+                            {userProfile?.username || '사용자'}님 안녕하세요!
+                        </Text>
+                    </View>
+                    <TouchableOpacity onPress={handleLogout}>
+                        <Text style={styles.logoutText}>로그아웃</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
-          </View>
-
-          <View style={styles.logoutContainer}>
-            <TouchableOpacity onPress={handleLogout}>
-              <Text style={styles.logoutText}>로그아웃</Text>
-            </TouchableOpacity>
-          </View>
-
           <TopTabs onSelectTab={setActiveTab} activeTab={activeTab} />
         </View>
 
@@ -177,6 +179,11 @@ const MypageScreen = () => {
               </View>
             )
           )}
+        />
+        <LogoutModal
+          visible={isLogoutModalVisible}
+          onClose={() => setLogoutModalVisible(false)}
+          onConfirm={confirmLogout}
         />
       </SafeAreaView>
     </LinearGradient>
@@ -220,13 +227,13 @@ const styles = StyleSheet.create({
   },
   welcomeCardWrapper: {
     paddingHorizontal: 20,
+    marginBottom: 30,
   },
-
   welcomeCard: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#FFFEF5',
+    backgroundColor: '#FFFFFF',
     paddingVertical: 36,
     paddingHorizontal: 20,
     borderRadius: 18,
@@ -237,24 +244,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    marginBottom: 10, 
+  },
+  welcomeMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   welcomeText: {
     fontSize: 18,
     color: '#424242',
-    fontWeight: 'normal',
-  },
-  userName: {
     fontWeight: 'bold',
-  },
-  logoutContainer: {
-    alignItems: 'flex-end',
-    paddingHorizontal: 20,
-    marginBottom: 10,
   },
   logoutText: {
     color: '#888',
     fontSize: 14,
+    textDecorationLine: 'underline',
   },
 
 

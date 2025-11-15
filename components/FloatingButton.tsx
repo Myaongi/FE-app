@@ -55,10 +55,10 @@ const styles = StyleSheet.create({
     fontSize: 38,
     color: 'white',
     marginRight: 8,
-        transform: [{ translateY: -2}],
+    transform: [{ translateY: -2}],
   },
   buttonText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: 'white',
   },

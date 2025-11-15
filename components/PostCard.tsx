@@ -1,22 +1,26 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet, Image, ViewStyle } from 'react-native';
 import { formatDisplayDate } from '../utils/time';
-import { mapStatusToKorean } from '../utils/format';
 import { Post } from '../types';
 import PuppyIcon from '../assets/images/puppy.svg';
 import FootIcon from '../assets/images/foot.svg';
-import MatchIcon from '../assets/images/match.svg';
+import StatusBadge from './StatusBadge'; // StatusBadge 컴포넌트 임포트
 
 interface PostCardProps {
-  type: 'lost' | 'witnessed';
+  type: 'lost' | 'found';
   title: string;
   species: string;
   color: string;
   location: string;
-  date: string;
+  date: Post['date'] | string; // Modified to accept string type
   status: Post['status'];
   photos?: string[];
   timeAgo?: string; 
+  backgroundColor?: string;
+  hideBadge?: boolean;
+  cardStyle?: ViewStyle; // Add this line
+  isAiImage?: boolean; // AI 이미지 여부
+  aiImage?: string | null; // AI 이미지 URL
 }
 
 const truncateText = (text: string, maxLength: number) => {
@@ -27,6 +31,7 @@ const truncateText = (text: string, maxLength: number) => {
 };
 
 const PostCard: React.FC<PostCardProps> = ({
+  type,
   title,
   species,
   color,
@@ -35,9 +40,16 @@ const PostCard: React.FC<PostCardProps> = ({
   status,
   photos,
   timeAgo,
+  backgroundColor,
+  hideBadge = false,
+  cardStyle, // Destructure cardStyle
+  isAiImage,
+  aiImage,
 }) => {
   const truncatedTitle = truncateText(title, 17);
-  const imageUri = photos && photos.length > 0 ? photos[0] : null;
+  
+  // AI 이미지를 우선적으로 확인하고, 없으면 기존 photos 배열을 사용
+  const imageUri = isAiImage && aiImage ? aiImage : (photos && photos.length > 0 ? photos[0] : null);
 
   const imageBorderStyle = [
     status === 'SIGHTED' && styles.sightedImageBorder,
@@ -51,6 +63,8 @@ const PostCard: React.FC<PostCardProps> = ({
       status === 'SIGHTED' && styles.sightedCard,
       status === 'RETURNED' && styles.returnedCard,
       status === 'MISSING' && styles.missingCard,
+      backgroundColor ? { backgroundColor } : {},
+      cardStyle, // Apply cardStyle here
     ]}>
       {imageUri ? (
         <Image source={{ uri: imageUri }} style={[styles.image, ...imageBorderStyle]} />
@@ -62,31 +76,30 @@ const PostCard: React.FC<PostCardProps> = ({
         <Text style={styles.title}>{truncatedTitle}</Text>
 
         <View style={styles.infoRow}>
-          <PuppyIcon width={16} height={16} style={styles.icon} />
+          <PuppyIcon width={16} height={16} style={styles.icon} color="#424242" />
           <Text style={styles.infoText}>{species}</Text>
           <Text style={styles.separator}>|</Text>
           <Text style={styles.infoText}>{color}</Text>
         </View>
 
         <View style={styles.infoRow}>
-          <FootIcon width={16} height={16} style={styles.icon} />
+          <FootIcon width={16} height={16} style={styles.icon} color="#424242" />
           <Text style={styles.infoText}>{location}</Text>
+          {timeAgo && (
+            <>
+              <Text style={styles.separator}>|</Text>
+              <Text style={styles.infoText}>{timeAgo}</Text>
+            </>
+          )}
         </View>
 
-        <View style={styles.infoRow}>
-          <MatchIcon width={16} height={16} style={styles.icon} />
-          <Text style={styles.infoText}>{timeAgo || formatDisplayDate(date)}</Text>
-        </View>
       </View>
       
-      <View style={[
-        styles.statusBadge,
-        status === 'SIGHTED' && styles.sightedStatusBadge,
-        status === 'RETURNED' && styles.returnedStatusBadge,
-        status === 'MISSING' && styles.missingStatusBadge,
-      ]}>
-        <Text style={styles.statusText}>{mapStatusToKorean(status)}</Text>
-      </View>
+      {!hideBadge && ( // Conditionally render StatusBadge
+        <View style={styles.badgeContainer}>
+          <StatusBadge status={status} />
+        </View>
+      )}
     </View>
   );
 };
@@ -94,26 +107,26 @@ const PostCard: React.FC<PostCardProps> = ({
 const styles = StyleSheet.create({
   cardContainer: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.50)',
+    backgroundColor: 'rgba(255, 255, 255, 0.54)',
     borderRadius: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 2,
     padding: 12,
     marginBottom: 16,
-    marginHorizontal: 16,
+    marginHorizontal: 12,
   },
   sightedCard: {
     borderRadius: 24,
     borderWidth: 2,
     borderColor: '#FEF3B1',
     opacity: 0.9,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: 'rgba(255, 255, 255, 0.54)',
     shadowColor: 'rgba(0, 0, 0, 0.25)',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
+    shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 5,
   },
@@ -122,10 +135,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#CDECFF',
     opacity: 0.9,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: 'rgba(255, 255, 255, 0.54)',
     shadowColor: 'rgba(0, 0, 0, 0.25)',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
+    shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 5,
   },
@@ -134,10 +147,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FFDBE3',
     opacity: 0.9,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: 'rgba(255, 255, 255, 0.54)',
     shadowColor: 'rgba(0, 0, 0, 0.25)',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
+    shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 5,
   },
@@ -167,13 +180,13 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 8,
     justifyContent: 'center',
   },
   title: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
-    marginBottom: 8, // Adjusted for new layout
+    marginBottom: 18, 
   },
   infoRow: {
     flexDirection: 'row',
@@ -191,50 +204,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
     color: '#ccc',
   },
-  statusBadge: {
+  badgeContainer: {
     position: 'absolute',
-    top: 12,
+    top: 13,
     right: 12,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  sightedStatusBadge: {
-    backgroundColor: '#FEF9C2',
-    borderWidth: 1,
-    borderColor: '#FFDB00',
-    borderRadius: 50,
-    shadowColor: 'rgba(0, 0, 0, 0.10)',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  returnedStatusBadge: {
-    backgroundColor: '#CDECFF',
-    borderWidth: 1,
-    borderColor: '#8ED7FF',
-    borderRadius: 50,
-    shadowColor: 'rgba(0, 0, 0, 0.10)',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  missingStatusBadge: {
-    backgroundColor: '#FFF0F5',
-    borderWidth: 1,
-    borderColor: '#FFDBE3',
-    borderRadius: 50,
-    shadowColor: 'rgba(0, 0, 0, 0.10)',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#333',
   },
 });
 

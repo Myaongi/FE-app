@@ -1,27 +1,27 @@
-// PostDetailContent.tsx
-
 import { useNavigation } from '@react-navigation/native';
 import React, { useState, useRef, useEffect } from 'react';
-import { 
+import {
   Alert,
-  SafeAreaView, 
-  ScrollView, 
-  StyleSheet, 
-  Text, 
-  TouchableOpacity, 
-  View, 
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
   Image,
   Modal,
   Dimensions
 } from 'react-native';
+import { getAddressFromCoordinates } from '../utils/location';
 
-// SVG 아이콘들을 임포트합니다. 
+// SVG 아이콘들을 임포트합니다.
 import BackIcon from '../assets/images/back.svg';
 import ReportIcon from '../assets/images/report.svg';
 import LogoIcon from '../assets/images/logo.svg';
-import FootIcon from '../assets/images/foot.svg';
 import EditIcon from '../assets/images/edit.svg';
 import DeleteIcon from '../assets/images/delete.svg';
+import FoundPin from '../assets/images/foundpin.svg';
+import LostPin from '../assets/images/lostpin.svg';
+import FootIcon from '../assets/images/foot.svg';
 
 // 색상별 아이콘 임포트
 import PinkCalendarIcon from '../assets/images/pinkcalendar.svg';
@@ -31,52 +31,42 @@ import YellowCalendarIcon from '../assets/images/yellocalendar.svg';
 import YellowClockIcon from '../assets/images/yellowclock.svg';
 import YellowLocationIcon from '../assets/images/yellowlocation.svg';
 
-import { Post, StackNavigation } from '../types';
+import { Post, Spot, StackNavigation } from '../types';
 import { formatDisplayDate, formatTime } from '../utils/time';
 import { mapStatusToKorean, mapGenderToKorean } from '../utils/format';
-import MapViewComponent from './MapViewComponent';
+import MapViewComponent, { MarkerData } from './MapViewComponent';
+import MapModal from './MapModal';
+import { Region } from 'react-native-maps';
 
 interface PostDetailContentProps {
   post: Post;
-  children: React.ReactNode; 
+  children: React.ReactNode;
   isGuest?: boolean;
   isMyPost?: boolean;
   handleEdit?: () => void;
   handleDelete?: () => void;
+  onReportPressForGuest?: () => void; // 게스트 신고 버튼 클릭 시 호출될 함수
 }
 
 const windowWidth = Dimensions.get('window').width;
 
-const PostDetailContent = ({ post, children, isGuest = false, isMyPost = false, handleEdit, handleDelete }: PostDetailContentProps) => {
+const PostDetailContent = ({ post, children, isGuest = false, isMyPost = false, handleEdit, handleDelete, onReportPressForGuest }: PostDetailContentProps) => {
   const navigation = useNavigation<StackNavigation>();
-  
+
   const [isImageModalVisible, setIsImageModalVisible] = useState(false);
+  const [isMapModalVisible, setMapModalVisible] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [fullAddress, setFullAddress] = useState<string | null>(null);
   const modalScrollViewRef = useRef<ScrollView>(null);
 
   const isLostPost = post.type === 'lost';
 
   const headerBackgroundColor = isLostPost ? '#FFECF1' : '#FEF3B1';
 
-  const imageUris = post.photos && post.photos.length > 0 ? post.photos : [];
-  
-  const initialMapRegion = {
-    latitude: post.latitude || 37.5665, 
-    longitude: post.longitude || 126.9780,
-    latitudeDelta: 0.02,
-    longitudeDelta: 0.02,
-  };
+  const imageUris = post.isAiImage && post.aiImage ? [post.aiImage] : (post.photos || []);
 
-  const mapMarkerCoords = post.latitude && post.longitude ? {
-    latitude: post.latitude,
-    longitude: post.longitude,
-    title: post.location,
-    description: post.location,
-  } : null;
-
-  // 주소 포매팅 로직
   const locationParts = post.location ? post.location.split(' ') : [];
-  const shortLocation = locationParts.length >= 3 ? `${locationParts[1]} ${locationParts[2]}` : post.location;
+  const shortLocation = locationParts.length >= 2 ? `${locationParts[0]} ${locationParts[1]}` : post.location;
 
   useEffect(() => {
     if (isImageModalVisible && modalScrollViewRef.current) {
@@ -85,28 +75,29 @@ const PostDetailContent = ({ post, children, isGuest = false, isMyPost = false, 
     }
   }, [isImageModalVisible, currentImageIndex]);
 
+  useEffect(() => {
+    const fetchAddress = async () => {
+      if (post.latitude && post.longitude) {
+        const address = await getAddressFromCoordinates(post.latitude, post.longitude);
+        setFullAddress(address);
+      } else {
+        setFullAddress(post.location || '주소 정보 없음');
+      }
+    };
+
+    fetchAddress();
+  }, [post.latitude, post.longitude, post.location]);
+
   const handleReportPress = () => {
     if (isGuest) {
-      Alert.alert(
-        '로그인이 필요합니다',
-        '신고 기능은 로그인이 필요합니다. 로그인 페이지로 이동하시겠습니까?',
-        [
-          { text: '취소', style: 'cancel' },
-          { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
-        ]
-      );
+      if (onReportPressForGuest) {
+        onReportPressForGuest();
+      }
       return;
     }
-    
+
     navigation.navigate('Report', {
-      postId: post.id,
-      postType: post.type,
-      postInfo: {
-        userName: post.userMemberName,
-        title: post.title,
-        location: post.location,
-        time: post.timeAgo || ''
-      }
+      post: post,
     });
   };
 
@@ -120,6 +111,101 @@ const PostDetailContent = ({ post, children, isGuest = false, isMyPost = false, 
     setCurrentImageIndex(index);
     setIsImageModalVisible(true);
   };
+
+  const CustomMapMarker = () => {
+    const titleColor = isLostPost ? '#FF6489' : '#FFDB00';
+    return (
+      <View style={styles.customMarkerContainer}>
+        {isLostPost ? <LostPin width={40} height={40} /> : <FoundPin width={40} height={40} />}
+        <View style={styles.customMarkerCallout}>
+          <Text style={[styles.customMarkerTitle, { color: titleColor }]}>{isLostPost ? '최초 실종' : '발견'}</Text>
+          <Text style={styles.customMarkerText} numberOfLines={1} ellipsizeMode="tail">{shortLocation}</Text>
+          <Text style={styles.customMarkerText}>{post.date ? formatDisplayDate(post.date) : ''} {post.date ? formatTime(post.date) : ''}</Text>
+        </View>
+      </View>
+    );
+  };
+
+  const SightingMarker = ({ latitude, longitude, index }: { latitude: number, longitude: number, index: number }) => (
+    <View style={styles.customMarkerContainer}>
+      <FoundPin width={40} height={40} />
+      <View style={styles.sightingMarkerCallout}>
+        <Text style={[styles.customMarkerTitle, { color: '#FFDB00' }]}>발견 {index + 1}</Text>
+      </View>
+    </View>
+  );
+
+  const uniqueCoordinates = new Set<string>();
+  const allPoints: { latitude: number, longitude: number }[] = [];
+
+  if (post.latitude && post.longitude) {
+    const coordString = `${post.latitude},${post.longitude}`;
+    if (!uniqueCoordinates.has(coordString)) {
+      uniqueCoordinates.add(coordString);
+      allPoints.push({ latitude: post.latitude, longitude: post.longitude });
+    }
+  }
+
+  if (post.latitudes && post.longitudes) {
+    for (let i = 0; i < post.latitudes.length; i++) {
+      const coordString = `${post.latitudes[i]},${post.longitudes[i]}`;
+      if (!uniqueCoordinates.has(coordString)) {
+        uniqueCoordinates.add(coordString);
+        allPoints.push({ latitude: post.latitudes[i], longitude: post.longitudes[i] });
+      }
+    }
+  }
+
+  const markers: MarkerData[] = [];
+  const initialCoordString = post.latitude && post.longitude ? `${post.latitude},${post.longitude}` : '';
+  const uniqueSightingCoords: { latitude: number, longitude: number }[] = [];
+
+  if (post.latitudes && post.longitudes) {
+    const seenCoords = new Set<string>();
+    if(initialCoordString) seenCoords.add(initialCoordString);
+
+    for (let i = 0; i < post.latitudes.length; i++) {
+      const coordString = `${post.latitudes[i]},${post.longitudes[i]}`;
+      if (!seenCoords.has(coordString)) {
+        seenCoords.add(coordString);
+        uniqueSightingCoords.push({ latitude: post.latitudes[i], longitude: post.longitudes[i] });
+      }
+    }
+  }
+
+  if (post.latitude && post.longitude) {
+    markers.push({
+      latitude: post.latitude,
+      longitude: post.longitude,
+      component: <CustomMapMarker />,
+    });
+  }
+
+  uniqueSightingCoords.forEach((coord, index) => {
+    markers.push({
+      latitude: coord.latitude,
+      longitude: coord.longitude,
+      component: <SightingMarker latitude={coord.latitude} longitude={coord.longitude} index={index} />,
+    });
+  });
+
+  let mapRegion: Region | undefined;
+  if (allPoints.length > 0) {
+    const lats = allPoints.map(p => p.latitude);
+    const lngs = allPoints.map(p => p.longitude);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+
+    mapRegion = {
+      latitude: (minLat + maxLat) / 2,
+      longitude: (minLng + maxLng) / 2,
+      latitudeDelta: (maxLat - minLat) * 1.5 || 0.02,
+      longitudeDelta: (maxLng - minLng) * 1.5 || 0.02,
+    };
+  }
+
 
   return (
     <View style={styles.container}>
@@ -154,7 +240,7 @@ const PostDetailContent = ({ post, children, isGuest = false, isMyPost = false, 
         <View style={styles.userInfoContainer}>
             <View>
                 <Text style={styles.userName}>{post.userMemberName}</Text>
-                <Text style={styles.postMeta}>{post.location} | {post.timeAgo}</Text>
+                <Text style={styles.postMeta}>{shortLocation} | {post.timeAgo}</Text>
             </View>
             <View style={[
               styles.statusBadge,
@@ -168,6 +254,11 @@ const PostDetailContent = ({ post, children, isGuest = false, isMyPost = false, 
 
         {imageUris.length > 0 ? (
           <View style={styles.imageSliderContainer}>
+            {post.isAiImage && (
+              <View style={styles.aiBanner}>
+                <Text style={styles.aiBannerText}>AI로 생성된 이미지입니다. 실제와 다를 수 있어요.</Text>
+              </View>
+            )}
             <ScrollView
               horizontal
               pagingEnabled
@@ -181,17 +272,19 @@ const PostDetailContent = ({ post, children, isGuest = false, isMyPost = false, 
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <View style={styles.indicatorContainer}>
-              {imageUris.map((_, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.indicator,
-                    index === currentImageIndex ? styles.activeIndicator : null,
-                  ]}
-                />
-              ))}
-            </View>
+            {imageUris.length > 1 && (
+              <View style={styles.indicatorContainer}>
+                {imageUris.map((_, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.indicator,
+                      index === currentImageIndex ? styles.activeIndicator : null,
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
           </View>
         ) : (
           <View style={styles.imagePlaceholder}>
@@ -200,7 +293,7 @@ const PostDetailContent = ({ post, children, isGuest = false, isMyPost = false, 
         )}
 
         <Text style={styles.postContentText}>{post.title}</Text>
-        
+
         <View style={styles.sectionHeader}>
             <LogoIcon width={24} height={24} />
             <Text style={styles.cardTitle}>강아지 기본 정보</Text>
@@ -243,7 +336,7 @@ const PostDetailContent = ({ post, children, isGuest = false, isMyPost = false, 
         </View>
 
         <View style={styles.sectionHeader}>
-            <FootIcon width={24} height={24} />
+            <FootIcon width={24} height={24} color="#000000" />
             <Text style={styles.cardTitle}>{isLostPost ? '실종 정보' : '발견 정보'}</Text>
         </View>
         <View style={styles.cardContainer}>
@@ -266,13 +359,17 @@ const PostDetailContent = ({ post, children, isGuest = false, isMyPost = false, 
                 {isLostPost ? <PinkLocationIcon width={24} height={24} /> : <YellowLocationIcon width={24} height={24} />}
                 <Text style={styles.infoLabel}>{isLostPost ? '실종 위치' : '발견 위치'}</Text>
               </View>
-              <Text style={styles.infoValue}>{post.location || '미입력'}</Text>
+              <Text style={styles.infoValue}>{fullAddress || '미입력'}</Text>
             </View>
-            {mapMarkerCoords && (
+            {markers.length > 0 && mapRegion && (
+              <TouchableOpacity onPress={() => setMapModalVisible(true)}>
                  <MapViewComponent
-                    initialRegion={initialMapRegion}
-                    markerCoords={mapMarkerCoords}
+                    style={styles.detailMapView}
+                    region={mapRegion}
+                    markers={markers}
+                    scrollEnabled={false} // 작은 지도 스크롤 방지
                   />
+              </TouchableOpacity>
             )}
         </View>
       </ScrollView>
@@ -287,8 +384,8 @@ const PostDetailContent = ({ post, children, isGuest = false, isMyPost = false, 
           onRequestClose={() => setIsImageModalVisible(false)}
         >
           <View style={styles.modalContainer}>
-            <TouchableOpacity 
-              style={styles.modalCloseButton} 
+            <TouchableOpacity
+              style={styles.modalCloseButton}
               onPress={() => setIsImageModalVisible(false)}
             >
               <Text style={styles.modalCloseButtonText}>X</Text>
@@ -308,6 +405,14 @@ const PostDetailContent = ({ post, children, isGuest = false, isMyPost = false, 
         </Modal>
       )}
 
+      {mapRegion && <MapModal
+        visible={isMapModalVisible}
+        onClose={() => setMapModalVisible(false)}
+        title="위치 상세보기"
+        region={mapRegion}
+        markers={markers}
+      />}
+
     </View>
   );
 };
@@ -324,6 +429,13 @@ const styles = StyleSheet.create({
     paddingTop: 70, // SafeArea 고려
     paddingBottom: 12,
     paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#D9D9D9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 1,
   },
   headerSide: {
     width: 80,
@@ -345,67 +457,109 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 16,
   },
- 
+
   headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    lineHeight: 24,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingBottom: 100, // 하단 버튼에 가려지지 않도록
   },
   userInfoContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 12,
     marginBottom: 12,
   },
   userName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#333'
+    color: '#424242'
   },
   postMeta: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#888',
     marginTop: 4,
   },
   statusBadge: {
     paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 50,
+    paddingHorizontal: 19,
+  },
+  sightedStatusBadge: {
+    backgroundColor: '#FEF9C2',
     borderWidth: 1,
+    borderColor: '#FFDB00',
+    borderRadius: 18,
     shadowColor: 'rgba(0, 0, 0, 0.10)',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 1,
     shadowRadius: 3,
     elevation: 2,
   },
-  sightedStatusBadge: {
-    backgroundColor: '#FEF9C2',
-    borderColor: '#FFDB00',
-  },
   returnedStatusBadge: {
     backgroundColor: '#CDECFF',
+    borderWidth: 1,
     borderColor: '#8ED7FF',
+    borderRadius: 18,
+    shadowColor: 'rgba(0, 0, 0, 0.10)',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   missingStatusBadge: {
     backgroundColor: '#FFF0F5',
+    borderWidth: 1,
     borderColor: '#FFDBE3',
+    borderRadius: 20642200,
+    shadowColor: 'rgba(0, 0, 0, 0.10)',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#333',
+    color: '#424242',
+    textAlign: 'center',
+    fontFamily: 'Apple SD Gothic Neo',
+    fontSize: 10,
+    fontStyle: 'normal',
+    fontWeight: '600',
+    lineHeight: 16,
   },
   imageSliderContainer: {
     marginBottom: 16,
     borderRadius: 12,
-    overflow: 'hidden', // borderRadius를 적용하기 위해 추가
+    overflow: 'hidden',
+  },
+  aiBanner: {
+    position: 'absolute',
+    top: 10, // 상단 패딩
+    paddingHorizontal: 15, // 좌우 패딩
+    paddingVertical: 8,
+    borderRadius: 31,
+    backgroundColor: 'rgba(142, 215, 255, 0.80)',
+    shadowColor: 'rgba(0, 0, 0, 0.25)',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 3,
+    elevation: 5,
+    zIndex: 1,
+    alignSelf: 'center',
+  },
+  aiBannerText: {
+    color: '#FFF',
+    textAlign: 'center',
+    fontSize: 11,
+    fontStyle: 'normal',
+    fontWeight: '500',
+    lineHeight: 16, // 'normal' 대신 적절한 값으로 설정
   },
   postImage: {
-    width: windowWidth - 32, // 좌우 패딩(16*2) 제외
+    width: windowWidth - 28, // 좌우 패딩(14*2) 제외
     height: 300,
     resizeMode: 'cover',
   },
@@ -440,16 +594,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#000',
     lineHeight: 24,
-    marginBottom: 16,
-    marginLeft: 10,
+    marginBottom: 30,
+    marginLeft: 14,
     fontWeight: 'bold',
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
     marginTop: 12,
-    marginLeft: 8,
+    marginLeft: 14,
   },
   cardContainer: {
     backgroundColor: '#FFFFFF',
@@ -462,13 +616,13 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginLeft: 8,
-    color: '#333',
+    marginLeft: 10,
+    color: '#000',
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 13,
   },
   iconInfoRow: {
     flexDirection: 'row',
@@ -489,16 +643,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     fontWeight: 'bold',
+    flex: 1,
+    flexWrap: 'wrap',
   },
   featureBox: {
-    backgroundColor: '#F9F9F9',
-    borderRadius: 8,
+    backgroundColor: '#F4F4F4',
+    borderRadius: 10,
     padding: 12,
   },
   featureText: {
     fontSize: 14,
     color: '#555',
     lineHeight: 20,
+  },
+  detailMapView: {
+    width: 340,
+    height: 121.074,
   },
   // Modal styles
   modalContainer: {
@@ -531,6 +691,37 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#000',
+  },
+  customMarkerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  customMarkerCallout: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    marginLeft: 8, 
+    flexShrink: 1,
+    maxWidth: 200,
+  },
+  sightingMarkerCallout: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    marginLeft: 8,
+    flexShrink: 1,
+    maxWidth: 200,
+  },
+  customMarkerTitle: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  customMarkerText: {
+    color: 'white',
+    fontSize: 12,
   },
 });
 

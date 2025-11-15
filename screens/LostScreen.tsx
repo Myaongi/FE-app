@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, FlatList, RefreshControl, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import LinearGradient from 'react-native-linear-gradient';
 import AppHeader from '../components/AppHeader';
@@ -9,12 +9,15 @@ import PostCard from '../components/PostCard';
 import FloatingButton from '../components/FloatingButton';
 import WritePostModal from '../components/WritePostModal';
 import FilterModal from '../components/FilterModal';
-import { getPosts } from '../service/mockApi';
-import { Post, StackNavigation } from '../types';
+import { getPosts, saveUserLocation } from '../service/mockApi';
+import { Post, PostFilters, RootStackParamList, RootTabParamList, StackNavigation } from '../types';
 import { AuthContext } from '../App';
+import LoginRequiredModal from '../components/LoginRequiredModal';
+
+type LostScreenRouteProp = RouteProp<RootTabParamList, 'Lost'>;
 
 const LostScreen = () => {
-  const [activeTab, setActiveTab] = useState<'lost' | 'witnessed'>('witnessed');
+  const [activeTab, setActiveTab] = useState<'lost' | 'found'>('found');
   const [posts, setPosts] = useState<Post[]>([]);
   const [page, setPage] = useState(0);
   const [hasNext, setHasNext] = useState(true);
@@ -22,12 +25,49 @@ const LostScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [isWriteModalVisible, setIsWriteModalVisible] = useState(false);
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+  const [isLoginModalVisible, setIsLoginModalVisible] = useState(false);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
-  const [filters, setFilters] = useState({ distance: 'all' as number | 'all', time: 'all' as number | 'all', sortBy: 'latest' as 'latest' | 'distance' });
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [filters, setFilters] = useState<PostFilters>({ distance: 'all', time: 'all', sortBy: 'latest' });
 
   const navigation = useNavigation<StackNavigation>();
+  const route = useRoute<LostScreenRouteProp>();
   const authContext = useContext(AuthContext);
   const isFocused = useIsFocused();
+
+  useEffect(() => {
+    if (route.params?.initialTab) {
+      setActiveTab(route.params.initialTab);
+      // Reset the param to avoid it being sticky
+      navigation.setParams({ initialTab: undefined });
+    }
+  }, [route.params?.initialTab]);
+
+  // 로그인한 사용자를 위한 위치 정보 자동 요청 및 저장
+  useEffect(() => {
+    const handleUserLocation = async () => {
+      if (isFocused && authContext?.isLoggedIn) {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        const hasPermission = status === 'granted';
+        setHasLocationPermission(hasPermission);
+
+        if (hasPermission) {
+          try {
+            const location = await Location.getCurrentPositionAsync({});
+            const { latitude, longitude } = location.coords;
+            setCurrentLocation({ latitude, longitude });
+            // 알림 기능을 위해 사용자 위치를 서버에 저장
+            await saveUserLocation(latitude, longitude);
+          } catch (error) {
+            console.warn('Could not get location for notifications', error);
+            setCurrentLocation(null);
+          }
+        }
+      }
+    };
+
+    handleUserLocation();
+  }, [isFocused, authContext?.isLoggedIn]);
 
   const loadPosts = async (isRefresh = false) => {
     if (loading && !isRefresh) return;
@@ -39,8 +79,7 @@ const LostScreen = () => {
 
     try {
       const apiType = activeTab === 'lost' ? 'lost' : 'found';
-      // TODO: Apply filters to getPosts call
-      const { posts: newPosts, hasNext: newHasNext } = await getPosts(apiType, currentPage);
+      const { posts: newPosts, hasNext: newHasNext } = await getPosts(apiType, currentPage, 20, filters, currentLocation);
       if (isRefresh) {
         setPosts(newPosts);
       } else {
@@ -79,26 +118,37 @@ const LostScreen = () => {
 
   const handleFloatingButtonPress = () => {
     if (!authContext?.isLoggedIn) {
-      Alert.alert('로그인 필요', '게시글을 작성하려면 로그인이 필요합니다.', [
-        { text: '취소', style: 'cancel' },
-        { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
-      ]);
+      setIsLoginModalVisible(true);
     } else {
       setIsWriteModalVisible(true);
     }
   };
 
+  // 필터 버튼 클릭 시 동작 (게스트 포함)
   const handleFilterPress = async () => {
-    if (authContext?.isLoggedIn) {
-      setHasLocationPermission(true);
-    } else {
+    // 로그인하지 않은 사용자에게만 권한 요청
+    if (!authContext?.isLoggedIn) {
       const { status } = await Location.requestForegroundPermissionsAsync();
+      const hasPermission = status === 'granted';
+      setHasLocationPermission(hasPermission);
+      if (hasPermission) {
+        try {
+          const location = await Location.getCurrentPositionAsync({});
+          setCurrentLocation({ latitude: location.coords.latitude, longitude: location.coords.longitude });
+        } catch (error) {
+          console.warn('Could not get location for filter', error);
+          setCurrentLocation(null);
+        }
+      }
+    } else {
+      // 이미 로그인 시점에 권한을 확인했으므로, 현재 상태를 그대로 사용
+      const { status } = await Location.getForegroundPermissionsAsync();
       setHasLocationPermission(status === 'granted');
     }
     setIsFilterModalVisible(true);
   };
 
-  const handleApplyFilters = (newFilters: any) => {
+  const handleApplyFilters = (newFilters: PostFilters) => {
     setFilters(newFilters);
     setIsFilterModalVisible(false);
   };
@@ -131,10 +181,7 @@ const LostScreen = () => {
           <AppHeader 
             onAlarmPress={() => {
               if (!authContext?.isLoggedIn) {
-                Alert.alert('로그인 필요', '알림을 확인하려면 로그인이 필요합니다.', [
-                  { text: '취소', style: 'cancel' },
-                  { text: '로그인', onPress: () => navigation.navigate('LoginScreen') },
-                ]);
+                setIsLoginModalVisible(true);
               } else {
                 navigation.navigate('NotificationsScreen');
               }
@@ -156,10 +203,11 @@ const LostScreen = () => {
                 date={item.date}
                 status={item.status}
                 photos={item.photos}
+                timeAgo={item.timeAgo}
               />
             </TouchableOpacity>
           )}
-          keyExtractor={(item, index) => `${item.id}-${index}`}
+          keyExtractor={(item, index) => `${item.id}-${index}` }
           contentContainerStyle={styles.content}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
@@ -184,6 +232,14 @@ const LostScreen = () => {
         initialFilters={filters}
         hasLocation={hasLocationPermission}
       />
+      <LoginRequiredModal
+        visible={isLoginModalVisible}
+        onClose={() => setIsLoginModalVisible(false)}
+        onConfirm={() => {
+          setIsLoginModalVisible(false);
+          navigation.navigate('LoginScreen');
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -193,9 +249,18 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   headerContainer: {
     borderBottomWidth: 1,
-    borderBottomColor: '#D9D9D9',
+    borderBottomColor: '#E5E7EB',
+    marginBottom: 8, 
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 3,
   },
-  content: { paddingHorizontal: 0, paddingTop: 10 },
+  content: { paddingHorizontal: 0, paddingTop: 20 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
   emptyText: { fontSize: 16, color: '#888' },
 });

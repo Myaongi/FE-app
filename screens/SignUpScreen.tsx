@@ -1,7 +1,8 @@
 import { useNavigation } from '@react-navigation/native';
 import React, { useLayoutEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet } from 'react-native';
+import { KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet } from 'react-native';
 import SignUpForm from '../components/SignUpForm';
+import SignUpSuccessModal from '../components/SignUpSuccessModal';
 import { signup } from '../service/mockApi';
 import { StackNavigation } from '../types';
 
@@ -12,6 +13,7 @@ const SignUpScreen = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [memberName, setMemberName] = useState('');
+  const [modalVisible, setModalVisible] = useState(false);
 
   const isValidEmail = (email: string) => {
     const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
@@ -63,9 +65,8 @@ const SignUpScreen = () => {
       console.log('📨 [SIGNUP SCREEN] signup 함수 응답 받음:', response);
       
       if (response.isSuccess) {
-        console.log('🎉 [SIGNUP SCREEN] 회원가입 성공, 알림 표시');
-        Alert.alert('회원가입 성공', '로그인 화면으로 이동합니다.');
-        navigation.goBack();
+        console.log('🎉 [SIGNUP SCREEN] 회원가입 성공, 모달 표시');
+        setModalVisible(true);
       } else {
         console.log('❌ [SIGNUP SCREEN] 회원가입 실패:', response.message);
       }
@@ -73,6 +74,11 @@ const SignUpScreen = () => {
       console.log('🚨 [SIGNUP SCREEN] 에러 발생:', err);
       console.log('🚨 [SIGNUP SCREEN] 에러 메시지:', err.message);
     }
+  };
+
+  const handleConfirm = () => {
+    setModalVisible(false);
+    navigation.goBack();
   };
 
   return (
@@ -97,6 +103,7 @@ const SignUpScreen = () => {
           onSignUp={handleSignUp}
         />
       </KeyboardAvoidingView>
+      <SignUpSuccessModal visible={modalVisible} onConfirm={handleConfirm} />
     </SafeAreaView>
   );
 };
@@ -104,7 +111,7 @@ const SignUpScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFEF5',
   },
   keyboardView: {
     flex: 1,

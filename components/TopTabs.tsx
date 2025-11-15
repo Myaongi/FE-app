@@ -2,18 +2,18 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
 interface TopTabsProps {
-  onSelectTab: (tab: 'lost' | 'witnessed') => void; 
-  activeTab: 'lost' | 'witnessed'; 
+  onSelectTab: (tab: 'lost' | 'found') => void;
+  activeTab: 'lost' | 'found';
 }
 
 const TopTabs: React.FC<TopTabsProps> = ({ onSelectTab, activeTab }) => {
   return (
     <View style={styles.container}>
       <TouchableOpacity
-        style={[styles.tab, activeTab === 'witnessed' && styles.activeWitnessed]} 
-        onPress={() => onSelectTab('witnessed')} 
+        style={[styles.tab, activeTab === 'found' && styles.activeFound]} // witnessed -> found
+        onPress={() => onSelectTab('found')} // witnessed -> found
       >
-        <Text style={[styles.tabText, activeTab === 'witnessed' && styles.activeTabText]}>
+        <Text style={[styles.tabText, activeTab === 'found' && styles.activeTabText]}>
           발견했어요
         </Text>
       </TouchableOpacity>
@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: '#D6D6D6',
   },
-  activeWitnessed: {
+  activeFound: { // activeWitnessed -> activeFound
     borderBottomColor: '#FFDB00',
   },
   activeLost: {

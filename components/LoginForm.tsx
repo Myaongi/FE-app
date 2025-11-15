@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import LoginLogo from '../assets/images/loginlogo.svg';
+import EmIcon from './icons/EmIcon';
+import PwIcon from './icons/PwIcon';
 
 interface LoginFormProps {
   email: string;
@@ -24,18 +27,18 @@ const LoginForm = ({
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   
+  const isEmailActive = emailFocused || email.trim() !== '';
+  const isPasswordActive = passwordFocused || password.trim() !== '';
 
   return (
     <View style={styles.container}>
-      <Text style={styles.logo}>강아지킴이</Text>
-      <Text style={styles.promptText}>강아지킴이에 로그인 해주세요!</Text>
+      <Text style={styles.promptText}>AI 기반 실종 반려견 매칭 서비스</Text>
+      <LoginLogo width={styles.logo.width} height={styles.logo.height} style={styles.logo} />
 
-
-      <View style={[styles.inputContainer ]}>
-        <Image 
-          source={(emailFocused || email.trim()) ? require('../assets/images/emon.png') : require('../assets/images/em.png')} 
-          style={styles.inputIcon} 
-        />
+      <View style={styles.inputContainer}>
+        <View style={styles.inputIcon}>
+          <EmIcon color={isEmailActive ? '#48BEFF' : '#D6D6D6'} />
+        </View>
         <TextInput
           style={styles.input}
           placeholder="이메일을 입력해주세요."
@@ -43,74 +46,59 @@ const LoginForm = ({
           keyboardType="email-address"
           autoCapitalize="none"
           value={email}
-          onChangeText={(text) => {
-            setEmail(text);
-          }}
+          onChangeText={setEmail}
           onFocus={() => setEmailFocused(true)}
           onBlur={() => setEmailFocused(false)}
         />
       </View>
 
-
-      
-      <View style={[styles.inputContainer ]}>
-        <Image 
-          source={(passwordFocused || password.trim()) ? require('../assets/images/pwon.png') : require('../assets/images/pw.png')} 
-          style={styles.inputIcon} 
-        />
+      <View style={styles.inputContainer}>
+        <View style={styles.inputIcon}>
+          <PwIcon color={isPasswordActive ? '#48BEFF' : '#D6D6D6'} />
+        </View>
         <TextInput
           style={styles.input}
           placeholder="비밀번호를 입력해주세요."
           placeholderTextColor="#B0B0B0"
           secureTextEntry
           value={password}
-          onChangeText={(text) => {
-            setPassword(text);
-
-          }}
+          onChangeText={setPassword}
           onFocus={() => setPasswordFocused(true)}
           onBlur={() => setPasswordFocused(false)}
         />
       </View>
 
-
       <TouchableOpacity style={styles.loginButton} onPress={onLogin}>
         <Text style={styles.loginButtonText}>로그인</Text>
       </TouchableOpacity>
-      
       
       <TouchableOpacity style={styles.signupButton} onPress={onSignUp}>
         <Text style={styles.signupButtonText}>회원가입</Text>
       </TouchableOpacity>
       
-
       <TouchableOpacity style={styles.guestButton} onPress={onGoBackToGuest}>
         <Text style={styles.guestButtonText}>비회원으로 이용하기</Text>
       </TouchableOpacity>
-      
     </View>
   );
 };
-
 
 const styles = StyleSheet.create({
   container: {
     width: '100%',
     paddingHorizontal: 20,
     alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-  },
-  logo: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
   },
   promptText: {
+    color: '#424242',
     fontSize: 16,
-    color: '#666',
-    marginBottom: 40,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  logo: {
+    width: 261,
+    height: 43,
+    marginBottom: 20,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -127,28 +115,33 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   input: {
     flex: 1,
     fontSize: 16,
     paddingVertical: 0,
   },
-  inputError: {
-    borderBottomColor: 'red',
-  },
-  errorText: { 
-    color: 'red',
-    fontSize: 14,
-    marginBottom: 10,
-  },
   loginButton: {
     width: '100%',
     height: 50,
-    backgroundColor: '#6A5ACD',
-    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 20,
+    borderRadius: 18,
+    backgroundColor: '#48BEFF',
+    ...Platform.select({
+      ios: {
+        shadowColor: 'rgba(0, 0, 0, 0.25)',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 1,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   loginButtonText: {
     color: '#fff',
@@ -158,26 +151,30 @@ const styles = StyleSheet.create({
   signupButton: {
     width: '100%',
     height: 50,
-    backgroundColor: '#fff',
-    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#6A5ACD',
     marginTop: 10,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#8ED7FF',
+    backgroundColor: '#FFF',
   },
   signupButtonText: {
-    color: '#6A5ACD',
+    color: '#8ED7FF', // This color was in the original, user didn't specify a new one, so I'll keep it for now.
     fontSize: 18,
     fontWeight: 'bold',
   },
-
   guestButton: {
     marginTop: 20,
   },
   guestButtonText: {
-    color: '#666',
-    fontSize: 15,
+    color: '#D6D6D6',
+    textAlign: 'center',
+    fontFamily: 'Apple SD Gothic Neo',
+    fontSize: 14,
+    fontStyle: 'normal',
+    fontWeight: '600',
+    lineHeight: 18, /* 100% */
     textDecorationLine: 'underline',
   },
 });

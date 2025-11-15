@@ -26,7 +26,7 @@ const NotificationsScreen = () => {
     if (screen === 'PostDetail') {
       if (params.postId && params.postType) {
         // 백엔드(FOUND)와 프론트(witnessed) 타입 매핑
-        const postTypeForNav = params.postType.toUpperCase() === 'LOST' ? 'lost' : 'witnessed';
+        const postTypeForNav = params.postType.toUpperCase() === 'LOST' ? 'lost' : 'found';
         navigation.navigate('PostDetail', { 
           id: params.postId.toString(), 
           type: postTypeForNav
@@ -46,8 +46,8 @@ const NotificationsScreen = () => {
         const targetChatRoom = chatList.find(chat => chat.id === params.chatroomId?.toString());
 
         if (targetChatRoom) {
-          const chatContext = targetChatRoom.postType === 'LOST' ? 'lostPostReport' : 'witnessedPostReport';
-          const type = targetChatRoom.postType === 'LOST' ? 'lost' : 'witnessed';
+          const chatContext = targetChatRoom.postType === 'LOST' ? 'lostPostReport' : 'foundPostReport';
+          const type = targetChatRoom.postType === 'LOST' ? 'lost' : 'found';
 
           navigation.navigate('ChatDetail', {
             ...targetChatRoom,
@@ -99,7 +99,6 @@ const NotificationsScreen = () => {
           </TouchableOpacity>
         )}
         contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
     );
   };
@@ -120,16 +119,20 @@ const NotificationsScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8F8F8',
+    backgroundColor:'#FFFEF5',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#EFEFEF',
+    borderBottomColor: '#D6D6D6',
+    shadowColor: 'rgba(0, 0, 0, 0.25)',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   backButton: {
     position: 'absolute',
@@ -138,7 +141,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: 'bold',
+
     color: '#000',
   },
   centered: {
@@ -151,12 +154,7 @@ const styles = StyleSheet.create({
     color: '#888',
   },
   listContent: {
-    paddingVertical: 0,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#EFEFEF',
-    marginLeft: 70, // Icon width + margins
+    paddingVertical: 16,
   },
 });
 

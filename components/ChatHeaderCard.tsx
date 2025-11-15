@@ -1,9 +1,9 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Image, ViewStyle } from 'react-native'; // Import ViewStyle
 import FootIcon from '../assets/images/foot.svg';
 import MatchIcon from '../assets/images/match.svg';
 import PuppyIcon from '../assets/images/puppy.svg';
-import { formatDisplayDate } from '../utils/time';
+import { formatDisplayDate, formatTime } from '../utils/time';
 import UpdateLocationButton from './UpdateLocationButton';
 
 interface ChatHeaderCardProps {
@@ -11,14 +11,16 @@ interface ChatHeaderCardProps {
   species: string;
   color: string;
   location: string;
-  date: string;
+  date: string | number[] | Date;
   status: '실종' | '발견' | '귀가 완료';
   photos?: string[];
-  chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
+  chatContext: 'match' | 'lostPostReport' | 'foundPostReport';
   isMyPost: boolean;
   onPress?: () => void;
   onUpdateLocation?: () => void;
   showDetails?: boolean;
+  style?: ViewStyle; 
+  showUpdateLocationButton?: boolean;
 }
 
 const getContextTitle = (context: string) => {
@@ -27,9 +29,10 @@ const getContextTitle = (context: string) => {
       return '매칭 시스템을 통해 시작된 1:1 채팅입니다';
     case 'lostPostReport':
       return '발견 제보를 통해 시작된 1:1 채팅입니다';
-    case 'witnessedPostReport':
-      return '발견했어요 게시글을 통해 시작된 1:1 채팅입니다';
-    default: '회원 정보';
+    case 'foundPostReport':
+      return null; // 이 컨텍스트에서는 제목을 표시하지 않음
+    default:
+      return null;
   }
 };
 
@@ -46,14 +49,49 @@ const ChatHeaderCard: React.FC<ChatHeaderCardProps> = ({
   onPress,
   onUpdateLocation,
   showDetails = true,
+  style, 
+  showUpdateLocationButton,
 }) => {
   const contextTitle = getContextTitle(chatContext);
   const statusBadgeColor = status === '실종' ? '#FDD7E4' : '#D3F9D8';
   const imageUri = photos && photos.length > 0 ? photos[0] : null;
 
+  const PostInfoContent = (
+    <>
+      <View style={styles.infoRow}>
+        <PuppyIcon width={16} height={16} style={styles.icon} color="#424242" />
+        <Text style={styles.infoText}>{species}</Text>
+        <Text style={styles.separator}>|</Text>
+        <Text style={styles.infoText}>{color}</Text>
+      </View>
+      <View style={styles.infoRow}>
+        <FootIcon width={16} height={16} style={styles.icon} color="#424242" />
+        <Text style={styles.infoText}>{location}</Text>
+        <Text style={styles.separator}>|</Text>
+        <Text style={styles.infoText}>{date ? `${formatDisplayDate(date)} ${formatTime(date)}` : '날짜 정보 없음'}</Text>
+      </View>
+    </>
+  );
+
+  if (chatContext === 'foundPostReport') {
+    return (
+      <TouchableOpacity style={[styles.postCardContainer, styles.sightedCard, style]} onPress={onPress} activeOpacity={0.8}>
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={[styles.postCardImage, styles.sightedImageBorder]} />
+        ) : (
+          <View style={[styles.postCardImagePlaceholder, styles.sightedImageBorder]} />
+        )}
+        <View style={styles.postCardInfoSection}>
+          <Text style={styles.postCardTitle} numberOfLines={1}>{title}</Text>
+          {PostInfoContent}
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
   return (
-    <TouchableOpacity style={styles.cardContainer} onPress={onPress} activeOpacity={0.8}>
-      <Text style={styles.contextTitle}>{contextTitle}</Text>
+    <TouchableOpacity style={[styles.cardContainer, style]} onPress={onPress} activeOpacity={0.8}>
+      {contextTitle && <Text style={styles.contextTitle}>{contextTitle}</Text>}
       {showDetails && (
         <>
           <View style={styles.contentWrapper}>
@@ -69,26 +107,10 @@ const ChatHeaderCard: React.FC<ChatHeaderCardProps> = ({
                   <Text style={styles.statusText}>{status}</Text>
                 </View>
               </View>
-              
-              {/* PostCard 스타일 적용 */}
-              <View style={styles.infoRow}>
-                <PuppyIcon width={16} height={16} style={styles.icon} />
-                <Text style={styles.infoText}>{species}</Text>
-                <Text style={styles.separator}>|</Text>
-                <Text style={styles.infoText}>{color}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <FootIcon width={16} height={16} style={styles.icon} />
-                <Text style={styles.infoText}>{location}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <MatchIcon width={16} height={16} style={styles.icon} />
-                <Text style={styles.infoText}>{formatDisplayDate(date)}</Text>
-              </View>
-
+              {PostInfoContent}
             </View>
           </View>
-          {chatContext === 'match' && isMyPost && onUpdateLocation && (
+          {showUpdateLocationButton && onUpdateLocation && (
             <UpdateLocationButton onPress={onUpdateLocation} />
           )}
         </>
@@ -99,7 +121,7 @@ const ChatHeaderCard: React.FC<ChatHeaderCardProps> = ({
 
 const styles = StyleSheet.create({
   cardContainer: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#FFF', 
     borderBottomWidth: 1,
     borderBottomColor: '#E9ECEF',
     padding: 10,
@@ -156,7 +178,6 @@ const styles = StyleSheet.create({
     color: '#343A40',
     fontWeight: 'bold',
   },
-  // PostCard에서 가져온 스타일
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -172,6 +193,53 @@ const styles = StyleSheet.create({
   separator: {
     marginHorizontal: 6,
     color: '#ccc',
+  },
+
+ 
+  postCardContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF',
+    padding: 12,
+    marginBottom: 16,
+    marginHorizontal: 12,
+  },
+  sightedCard: {
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#FEF3B1',
+    opacity: 0.9,
+    shadowColor: 'rgba(0, 0, 0, 0.25)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  postCardImage: {
+    width: 90,
+    height: 90,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 10,
+  },
+  postCardImagePlaceholder: {
+    width: 90,
+    height: 90,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 10,
+  },
+  sightedImageBorder: {
+    borderWidth: 2,
+    borderColor: '#FEF3B1',
+  },
+  postCardInfoSection: {
+    flex: 1,
+    marginLeft: 8,
+    justifyContent: 'center',
+  },
+  postCardTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 18,
+    color: '#212529',
   },
 });
 

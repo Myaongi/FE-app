@@ -13,8 +13,9 @@ import {
   View,
 } from 'react-native';
 import CancelIcon from '../assets/images/cancel.svg';
+import PostSuccessModal from '../components/PostSuccessModal';
 import WritePostForm, { WritePostFormRef } from '../components/WritePostForm';
-import { addPost, getPostById, updatePost } from '../service/mockApi';
+import { addPost, getPostById, triggerMatching, updatePost } from '../service/mockApi';
 import { Post, PostPayload, RootStackParamList, StackNavigation } from '../types';
 
 type WritePostScreenRouteProp = RouteProp<RootStackParamList, 'WritePostScreen'>;
@@ -30,6 +31,10 @@ const WritePostScreen = () => {
   const [post, setPost] = useState<Post | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSuccessModalVisible, setSuccessModalVisible] = useState(false);
+  const [newPostInfo, setNewPostInfo] = useState<{ postId: string; type: 'lost' | 'found' } | null>(
+    null,
+  );
 
   const formRef = useRef<WritePostFormRef>(null);
   const [isFormValid, setIsFormValid] = useState(false);
@@ -69,23 +74,47 @@ const WritePostScreen = () => {
     newImageUris: string[],
     existingImageUrls: string[],
     deletedImageUrls: string[],
+    aiImage: string | null,
   ) => {
     if (isSaving) return;
     setIsSaving(true);
     try {
       if (editMode && postId) {
-        await updatePost(postId, postData, newImageUris, existingImageUrls, deletedImageUrls);
+        await updatePost(postId, postData, newImageUris, existingImageUrls, deletedImageUrls, aiImage);
         Alert.alert('성공', '게시글이 수정되었습니다.');
         navigation.replace('PostDetail', { id: postId, type: type });
       } else {
-        const newPost = await addPost(postData, newImageUris);
-        Alert.alert('성공', '게시글이 등록되었습니다.');
-        navigation.replace('PostDetail', { id: newPost.postId.toString(), type: type });
+        const newPost = await addPost(postData, newImageUris, aiImage);
+        const postTypeForMatching = type === 'lost' ? 'LOST' : 'FOUND';
+        await triggerMatching(newPost.postId, postTypeForMatching);
+
+        setNewPostInfo({ postId: newPost.postId.toString(), type: type });
+        setSuccessModalVisible(true);
       }
     } catch (error: any) {
       Alert.alert('오류', error.message || '게시글 저장에 실패했습니다.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setSuccessModalVisible(false);
+    if (newPostInfo) {
+      navigation.replace('PostDetail', { id: newPostInfo.postId, type: newPostInfo.type });
+    }
+  };
+
+  const handleConfirmModal = () => {
+    setSuccessModalVisible(false);
+    if (newPostInfo) {
+      const targetTab = newPostInfo.type === 'lost' ? 'found' : 'lost';
+      navigation.navigate('RootTab', {
+        screen: 'Lost',
+        params: {
+          initialTab: targetTab,
+        },
+      });
     }
   };
 
@@ -125,7 +154,7 @@ const WritePostScreen = () => {
           <View style={styles.dummyView} />
         </View>
 
-        {isSaving ? (
+        {isSaving && !isSuccessModalVisible ? (
           <ActivityIndicator style={styles.loader} size="large" />
         ) : (
           <View style={{ flex: 1 }}>
@@ -156,6 +185,14 @@ const WritePostScreen = () => {
           </View>
         )}
       </KeyboardAvoidingView>
+      {newPostInfo && (
+        <PostSuccessModal
+          visible={isSuccessModalVisible}
+          onClose={handleCloseModal}
+          onConfirm={handleConfirmModal}
+          postType={newPostInfo.type}
+        />
+      )}
     </SafeAreaView>
   );
 };

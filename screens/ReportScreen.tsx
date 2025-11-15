@@ -10,35 +10,33 @@ import {
   View,
 } from 'react-native';
 import { reportPost } from '../service/mockApi';
+import PostCard from '../components/PostCard';
+import { Post } from '../types';
+import { LinearGradient } from 'react-native-linear-gradient';
+import CancelIcon from '../assets/images/cancel.svg';
+import AllIcon from '../assets/images/All.svg';
 
 interface ReportScreenProps {
   navigation: any;
   route: {
     params: {
-      postId: string;
-      postType: 'lost' | 'witnessed';
-      postInfo: {
-        userName: string;
-        title: string;
-        location: string;
-        time: string;
-      };
+      post: Post;
     };
   };
 }
 
 const ReportScreen: React.FC<ReportScreenProps> = ({ navigation, route }) => {
-  const { postId, postType, postInfo } = route.params;
+  const { post } = route.params;
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [reportDetails, setReportDetails] = useState<string>('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const reportReasons = [
-    { key: 'FAKE', emoji: '★', text: '허위/장난 제보 같아요' },
-    { key: 'SPAM', emoji: '■', text: '스팸·홍보/도배 글이에요' },
-    { key: 'OFFENSIVE', emoji: '●', text: '불쾌한 표현이 있어요' },
-    { key: 'INAPPROPRIATE', emoji: '•', text: '부적절한 사진/내용이에요' },
-    { key: 'COPYRIGHT', emoji: '●', text: '다른 사람 사진/글을 무단으로 썼어요' },
+    { key: 'FAKE', emoji: '🙅', text: '허위/장난 제보 같아요' },
+    { key: 'SPAM', emoji: '📢', text: '스팸·홍보/도배 글이에요' },
+    { key: 'OFFENSIVE', emoji: '😣', text: '불쾌한 표현이 있어요' },
+    { key: 'INAPPROPRIATE', emoji: '🔞', text: '부적절한 사진/내용이에요' },
+    { key: 'COPYRIGHT', emoji: '📷', text: '다른 사람 사진/글을 무단으로 썼어요' },
   ];
 
   const handleSubmit = async () => {
@@ -48,7 +46,7 @@ const ReportScreen: React.FC<ReportScreenProps> = ({ navigation, route }) => {
     }
     
     try {
-      await reportPost(postId, postType, { 
+      await reportPost(post.id, post.type, { 
         reportType: selectedReason, 
         reportContent: reportDetails 
       });
@@ -69,111 +67,128 @@ const ReportScreen: React.FC<ReportScreenProps> = ({ navigation, route }) => {
   };
 
   return (
-    <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleClose} style={styles.backButton}>
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>신고하기</Text>
-          <View style={{ width: 40 }} />
-        </View>
-
-        <ScrollView style={styles.content}>
-          <View style={styles.postSection}>
-            <Text style={styles.sectionTitle}>신고할 게시글</Text>
-            <View style={styles.postInfoBox}>
-              <Text style={styles.postUserName}>{postInfo.userName}</Text>
-              <Text style={styles.postTitle}>{postInfo.title}</Text>
-              <Text style={styles.postLocation}>{postInfo.location} | {postInfo.time}</Text>
-            </View>
-          </View>
-
-          <View style={styles.reasonSection}>
-            <Text style={styles.sectionTitle}>신고 유형</Text>
-            <View style={styles.reasonsContainer}>
-              {reportReasons.map((reason, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.reasonItem}
-                  onPress={() => setSelectedReason(reason.key)}
-                >
-                  <View style={styles.radioContainer}>
-                    <View style={[
-                      styles.radioButton,
-                      selectedReason === reason.key && styles.radioButtonSelected
-                    ]}>
-                      {selectedReason === reason.key && (
-                        <View style={styles.radioInner} />
-                      )}
-                    </View>
-                  </View>
-                  <Text style={styles.reasonEmoji}>{reason.emoji}</Text>
-                  <Text style={styles.reasonText}>{reason.text}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.detailsSection}>
-            <Text style={styles.sectionTitle}>신고 내용 (선택)</Text>
-            <TextInput
-              style={styles.detailsInput}
-              placeholder="커뮤니티와 너무 무관한 장난성 글이에요;;;"
-              placeholderTextColor="#999"
-              value={reportDetails}
-              onChangeText={setReportDetails}
-              multiline
-              numberOfLines={4}
-            />
-          </View>
-        </ScrollView>
-
-        <TouchableOpacity
-          style={[
-            styles.submitButton,
-            !selectedReason && styles.submitButtonDisabled
-          ]}
-          onPress={handleSubmit}
-          disabled={!selectedReason}
-        >
-          <Text style={[
-            styles.submitButtonText,
-            !selectedReason && styles.submitButtonTextDisabled
-          ]}>신고하기</Text>
-        </TouchableOpacity>
-
-      <Modal
-        visible={showSuccessModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={handleSuccessClose}
-      >
-        <View style={styles.successOverlay}>
-          <View style={styles.successModalContainer}>
-            <TouchableOpacity onPress={handleSuccessClose} style={styles.successCloseButton}>
-              <Text style={styles.successCloseButtonText}>×</Text>
+    <LinearGradient
+      colors={['#FEFCE8', '#EFF6FF', '#F0F9FF']}
+      style={styles.gradient}
+    >
+      <View style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={handleClose} style={styles.backButton}>
+              <Text style={styles.backButtonText}>←</Text>
             </TouchableOpacity>
-            
-            <View style={styles.successIconContainer}>
-              <Text style={styles.successCheckmark}>✓</Text>
-            </View>
-            
-            <Text style={styles.successTitle}>신고가 정상적으로 접수되었어요</Text>
-            <Text style={styles.successMessage}>
-              관리자가 최대 24시간 이내 확인할 예정이에요.{'\n'}
-              안전한 커뮤니티를 지켜주셔서 감사합니다♡
-            </Text>
+            <Text style={styles.title}>신고하기</Text>
+            <View style={{ width: 40 }} />
           </View>
-        </View>
-      </Modal>
-    </View>
+
+          <ScrollView style={styles.content}>
+            <View style={styles.postSection}>
+              <Text style={[styles.sectionTitle, { paddingHorizontal: 16 }]}>신고할 게시글</Text>
+              <PostCard 
+                type={post.type}
+                title={post.title}
+                species={post.species}
+                color={post.color}
+                location={post.location}
+                date={post.date}
+                status={post.status}
+                photos={post.photos}
+                timeAgo={post.timeAgo}
+                backgroundColor="#FFF"
+              />
+            </View>
+
+            <View style={[styles.reasonSection, { paddingHorizontal: 16 }]}>
+              <Text style={styles.sectionTitle}>신고 유형</Text>
+              <View style={styles.reasonsContainer}>
+                {reportReasons.map((reason, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.reasonItem}
+                    onPress={() => setSelectedReason(reason.key)}
+                  >
+                    <View style={styles.radioContainer}>
+                      <View style={[ 
+                        styles.radioButton,
+                        selectedReason === reason.key && styles.radioButtonSelected
+                      ]}>
+                        {selectedReason === reason.key && (
+                          <View style={styles.radioInner} />
+                        )}
+                      </View>
+                    </View>
+                    <Text style={styles.reasonEmoji}>{reason.emoji}</Text>
+                    <Text style={styles.reasonText}>{reason.text}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={[styles.detailsSection, { paddingHorizontal: 16 }]}>
+              <Text style={styles.sectionTitle}>신고 내용 (선택)</Text>
+              <TextInput
+                style={styles.detailsInput}
+                placeholder="(예) 커뮤니티와 전혀 무관한 장난성 글이에요"
+                placeholderTextColor="#999"
+                value={reportDetails}
+                onChangeText={setReportDetails}
+                multiline
+                numberOfLines={4}
+              />
+            </View>
+          </ScrollView>
+
+          <View style={{ paddingHorizontal: 16 }}>
+            <TouchableOpacity
+              style={[ 
+                styles.submitButton,
+                !selectedReason && styles.submitButtonDisabled
+              ]}
+              onPress={handleSubmit}
+              disabled={!selectedReason}
+            >
+              <Text style={[ 
+                styles.submitButtonText,
+                !selectedReason && styles.submitButtonTextDisabled
+              ]}>신고하기</Text>
+            </TouchableOpacity>
+          </View>
+
+        <Modal
+          visible={showSuccessModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={handleSuccessClose}
+        >
+          <View style={styles.successOverlay}>
+            <View style={styles.successModalContainer}>
+              <TouchableOpacity onPress={handleSuccessClose} style={styles.successCloseButton}>
+                <CancelIcon width={24} height={24} />
+              </TouchableOpacity>
+              
+              <View style={styles.successIconContainer}>
+                <AllIcon width={24} height={24} />
+              </View>
+              
+              <Text style={styles.successTitle}>신고 접수가 완료되었습니다.</Text>
+              <Text style={styles.successMessage}>
+                관리자가 최대 24시간 이내 확인할 예정이에요.{'\n'}
+                안전한 커뮤니티를 지켜주셔서 감사합니다💛
+              </Text>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
@@ -183,7 +198,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingTop: 60,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
   backButton: {
     width: 40,
@@ -198,11 +213,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#000',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
   },
   postSection: {
     marginTop: 20,
@@ -215,32 +229,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#333',
     marginBottom: 12,
-  },
-  postInfoBox: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  postUserName: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  postTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  postLocation: {
-    fontSize: 14,
-    color: '#666',
   },
   reasonsContainer: {
     gap: 8,
@@ -248,12 +240,7 @@ const styles = StyleSheet.create({
   reasonItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
+    paddingVertical: 10,
   },
   radioContainer: {
     marginRight: 12,
@@ -277,33 +264,41 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
   },
   reasonEmoji: {
-    fontSize: 16,
-    marginRight: 8,
-    width: 20,
+    fontSize: 14,
+    marginRight: 1,
+    width: 24,
     textAlign: 'center',
   },
   reasonText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#333',
     flex: 1,
   },
   detailsInput: {
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: 'rgba(0, 0, 0, 0.05)',
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
+    fontSize: 14,
     color: '#333',
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
     minHeight: 100,
     textAlignVertical: 'top',
   },
   submitButton: {
-    backgroundColor: '#007AFF',
-    margin: 16,
-    paddingVertical: 16,
-    borderRadius: 8,
+    borderRadius: 18,
+    backgroundColor: '#48BEFF', // var(--strong-blue, #48BEFF)
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 5, // For Android
+    height: 50,
+    paddingVertical: 14,
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 10,
+    marginBottom: 30, // Increased from 16 to 30 for more space
   },
   submitButtonDisabled: {
     backgroundColor: '#e9ecef',
@@ -323,8 +318,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   successModalContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: '#FFFEF5',
+    borderRadius: 18,
     padding: 24,
     width: '90%',
     maxWidth: 400,
@@ -335,34 +330,20 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 16,
     right: 16,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  successCloseButtonText: {
-    fontSize: 18,
-    color: '#666',
   },
   successIconContainer: {
-    position: 'relative',
-    marginBottom: 20,
-  },
-  successCheckmark: {
-    fontSize: 48,
-    color: '#4CAF50',
+    marginBottom: 10,
   },
   successTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#333',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
+    lineHeight: 22,
   },
   successMessage: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
     textAlign: 'center',
     lineHeight: 20,
