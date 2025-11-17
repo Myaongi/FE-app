@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, TouchableWithoutFeedba
 interface WritePostModalProps {
   visible: boolean;
   onClose: () => void;
-  onSelectOption: (option: 'lost' | 'witnessed') => void; 
+  onSelectOption: (option: 'lost' | 'found') => void;
 }
 
 const WritePostModal: React.FC<WritePostModalProps> = ({ visible, onClose, onSelectOption }) => {
@@ -20,15 +20,15 @@ const WritePostModal: React.FC<WritePostModalProps> = ({ visible, onClose, onSel
           <View style={styles.modalView}>
             <TouchableOpacity 
               style={styles.button}
-              onPress={() => onSelectOption('lost')}
+              onPress={() => onSelectOption('found')} 
             >
-              <Text style={styles.buttonText}>잃어버렸어요</Text>
+              <Text style={styles.buttonText}>발견했어요</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.button, styles.lastButton]}
-              onPress={() => onSelectOption('witnessed')} 
+              onPress={() => onSelectOption('lost')}
             >
-              <Text style={styles.buttonText}>발견했어요</Text>
+              <Text style={styles.buttonText}>잃어버렸어요</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -43,11 +43,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingBottom: 175,
+    paddingBottom: 170,
   },
   modalView: {
     margin: 20,
-    backgroundColor: 'white',
+    backgroundColor: '#8ED7FF',
     borderRadius: 10,
     alignItems: 'center',
     shadowColor: '#000',
@@ -55,23 +55,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    minWidth: 200,
-    paddingVertical: 10,
+    minWidth: 160,
+    paddingVertical: 8.
   },
   button: {
     width: '100%',
-    paddingVertical: 15,
+    paddingVertical: 8,
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#fff',
   },
   lastButton: {
     borderBottomWidth: 0,
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
   },
   
 });

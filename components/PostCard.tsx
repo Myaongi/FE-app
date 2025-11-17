@@ -1,16 +1,28 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image, ViewStyle } from 'react-native';
+import { formatDisplayDate } from '../utils/time';
+import { Post } from '../types';
+import PuppyIcon from '../assets/images/puppy.svg';
+import FootIcon from '../assets/images/foot.svg';
+import StatusBadge from './StatusBadge'; // StatusBadge 컴포넌트 임포트
 
 interface PostCardProps {
-  type: 'lost' | 'witnessed';
+  type: 'lost' | 'found';
   title: string;
   species: string;
   color: string;
   location: string;
-  date: string;
-  status: string;
+  date: Post['date'] | string; // Modified to accept string type
+  status: Post['status'];
+  photos?: string[];
+  timeAgo?: string; 
+  backgroundColor?: string;
+  hideBadge?: boolean;
+  cardStyle?: ViewStyle; // Add this line
+  isAiImage?: boolean; // AI 이미지 여부
+  aiImage?: string | null; // AI 이미지 URL
 }
-//제목 글자 수 제한
+
 const truncateText = (text: string, maxLength: number) => {
   if (text.length > maxLength) {
     return text.substring(0, maxLength) + '...';
@@ -19,36 +31,75 @@ const truncateText = (text: string, maxLength: number) => {
 };
 
 const PostCard: React.FC<PostCardProps> = ({
+  type,
   title,
   species,
   color,
   location,
   date,
   status,
+  photos,
+  timeAgo,
+  backgroundColor,
+  hideBadge = false,
+  cardStyle, // Destructure cardStyle
+  isAiImage,
+  aiImage,
 }) => {
   const truncatedTitle = truncateText(title, 17);
+  
+  // AI 이미지를 우선적으로 확인하고, 없으면 기존 photos 배열을 사용
+  const imageUri = isAiImage && aiImage ? aiImage : (photos && photos.length > 0 ? photos[0] : null);
+
+  const imageBorderStyle = [
+    status === 'SIGHTED' && styles.sightedImageBorder,
+    status === 'RETURNED' && styles.returnedImageBorder,
+    status === 'MISSING' && styles.missingImageBorder,
+  ];
 
   return (
-    <View style={styles.cardContainer}>
-      <View style={styles.imagePlaceholder} />
+    <View style={[
+      styles.cardContainer,
+      status === 'SIGHTED' && styles.sightedCard,
+      status === 'RETURNED' && styles.returnedCard,
+      status === 'MISSING' && styles.missingCard,
+      backgroundColor ? { backgroundColor } : {},
+      cardStyle, // Apply cardStyle here
+    ]}>
+      {imageUri ? (
+        <Image source={{ uri: imageUri }} style={[styles.image, ...imageBorderStyle]} />
+      ) : (
+        <View style={[styles.imagePlaceholder, ...imageBorderStyle]} />
+      )}
 
       <View style={styles.contentContainer}>
-
         <Text style={styles.title}>{truncatedTitle}</Text>
 
         <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>색상 </Text>
-          <Text style={styles.infoValue}>{color} </Text>
-          <Text style={styles.infoLabel}>종 </Text>
-          <Text style={styles.infoValue}>{species} </Text>
+          <PuppyIcon width={16} height={16} style={styles.icon} color="#424242" />
+          <Text style={styles.infoText}>{species}</Text>
+          <Text style={styles.separator}>|</Text>
+          <Text style={styles.infoText}>{color}</Text>
         </View>
-        <Text style={styles.infoText}>{location}</Text>
-        <Text style={styles.infoText}>{date}</Text>
+
+        <View style={styles.infoRow}>
+          <FootIcon width={16} height={16} style={styles.icon} color="#424242" />
+          <Text style={styles.infoText}>{location}</Text>
+          {timeAgo && (
+            <>
+              <Text style={styles.separator}>|</Text>
+              <Text style={styles.infoText}>{timeAgo}</Text>
+            </>
+          )}
+        </View>
+
       </View>
       
-      <View style={styles.statusBadge}>
-        <Text style={styles.statusText}>{status}</Text>
-      </View>
+      {!hideBadge && ( // Conditionally render StatusBadge
+        <View style={styles.badgeContainer}>
+          <StatusBadge status={status} />
+        </View>
+      )}
     </View>
   );
 };
@@ -56,65 +107,107 @@ const PostCard: React.FC<PostCardProps> = ({
 const styles = StyleSheet.create({
   cardContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.54)',
     borderRadius: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 2,
     padding: 12,
     marginBottom: 16,
-    marginHorizontal: 16,
+    marginHorizontal: 12,
+  },
+  sightedCard: {
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#FEF3B1',
+    opacity: 0.9,
+    backgroundColor: 'rgba(255, 255, 255, 0.54)',
+    shadowColor: 'rgba(0, 0, 0, 0.25)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  returnedCard: {
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#CDECFF',
+    opacity: 0.9,
+    backgroundColor: 'rgba(255, 255, 255, 0.54)',
+    shadowColor: 'rgba(0, 0, 0, 0.25)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  missingCard: {
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#FFDBE3',
+    opacity: 0.9,
+    backgroundColor: 'rgba(255, 255, 255, 0.54)',
+    shadowColor: 'rgba(0, 0, 0, 0.25)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  image: {
+    width: 90,
+    height: 90,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 10,
   },
   imagePlaceholder: {
     width: 80,
     height: 80,
     backgroundColor: '#e0e0e0',
-    borderRadius: 8,
+    borderRadius: 10,
+  },
+  sightedImageBorder: {
+    borderWidth: 2,
+    borderColor: '#FEF3B1',
+  },
+  returnedImageBorder: {
+    borderWidth: 2,
+    borderColor: '#CDECFF',
+  },
+  missingImageBorder: {
+    borderWidth: 2,
+    borderColor: '#FFDBE3',
   },
   contentContainer: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 8,
     justifyContent: 'center',
   },
   title: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 18, 
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 4,
   },
-  infoLabel: {
-    fontSize: 12,
-    color: '#888',
-  },
-  infoValue: {
-    fontSize: 12,
-    color: '#333',
-    marginRight: 8,
+  icon: {
+    marginRight: 6,
   },
   infoText: {
     fontSize: 12,
     color: '#333',
-    marginBottom: 2,
   },
-  statusBadge: {
+  separator: {
+    marginHorizontal: 6,
+    color: '#ccc',
+  },
+  badgeContainer: {
     position: 'absolute',
-    top: 12,
+    top: 13,
     right: 12,
-    backgroundColor: '#f0f0f0',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#333',
   },
 });
 

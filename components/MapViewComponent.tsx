@@ -1,51 +1,45 @@
-import React, { useState, useEffect } from 'react';
-import MapView, { Marker, Region } from 'react-native-maps';
-import { StyleSheet, View } from 'react-native';
+import React from 'react';
+import MapView, { Marker, Region } from 'react-native-maps'; 
+import { StyleSheet, View, ViewStyle } from 'react-native';
 
-interface MapProps {
-  initialRegion: Region;
-  markerCoords?: {
-    latitude: number;
-    longitude: number;
-    title: string;
-    description?: string; 
-  };
-  onRegionChange?: (region: Region) => void;
+export interface MarkerData {
+  latitude: number;
+  longitude: number;
+  component: React.ReactNode;
 }
 
-const MapViewComponent: React.FC<MapProps> = ({ initialRegion, markerCoords, onRegionChange }) => {
-  const [region, setRegion] = useState(initialRegion);
+interface MapProps {
+  region: Region;
+  markers?: MarkerData[];
+  onRegionChange?: (region: Region) => void;
+  style?: ViewStyle;
+  scrollEnabled?: boolean;
+  onMarkerDragEnd?: (coordinate: { latitude: number; longitude: number }) => void;
+}
 
-  useEffect(() => {
-    if (markerCoords) {
-      // 마커 좌표가 변경될 때마다 지도를 해당 위치로 이동
-      setRegion({
-        latitude: markerCoords.latitude,
-        longitude: markerCoords.longitude,
-        latitudeDelta: 0.005, // 더 가까이 줌인
-        longitudeDelta: 0.005, // 더 가까이 줌인
-      });
-    }
-  }, [markerCoords]);
+const MapViewComponent: React.FC<MapProps> = ({ region, markers, onRegionChange, style, scrollEnabled = true, onMarkerDragEnd }) => {
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, style]}>
       <MapView
         style={styles.map}
-        initialRegion={initialRegion}
         region={region}
         onRegionChangeComplete={onRegionChange}
+        scrollEnabled={scrollEnabled}
       >
-        {markerCoords && (
+        {markers && markers.map((marker, index) => (
           <Marker
+            key={index}
             coordinate={{
-              latitude: markerCoords.latitude,
-              longitude: markerCoords.longitude,
+              latitude: marker.latitude,
+              longitude: marker.longitude,
             }}
-            title={markerCoords.title}
-            description={markerCoords.description}
-          />
-        )}
+            draggable={!!onMarkerDragEnd}
+            onDragEnd={(e) => onMarkerDragEnd?.(e.nativeEvent.coordinate)}
+          >
+            {marker.component}
+          </Marker>
+        ))}
       </MapView>
     </View>
   );

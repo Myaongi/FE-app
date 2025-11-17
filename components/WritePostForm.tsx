@@ -1,45 +1,90 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
+import { Buffer } from 'buffer';
+
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Image,
   Modal,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import DropdownIcon from '../assets/images/dropdown.svg';
-import { addPost, getColorList, getSpeciesList, mockGeocode } from '../service/mockApi';
-import MapViewComponent from './MapViewComponent';
-import { Post } from '../types';
+import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-interface WritePostFormProps {
-  type: 'lost' | 'witnessed';
-  onSubmit: (post: Post) => void;
+
+// 아이콘 임포트
+import AiIcon from '../assets/images/ai.svg';
+import CameraIcon from '../assets/images/camera.svg';
+import LogoIcon from '../assets/images/logo.svg';
+import CalendarIcon from '../assets/images/calendar.svg';
+import ClockIcon from '../assets/images/clock.svg';
+import LocationIcon from '../assets/images/location.svg';
+import FootIcon from '../assets/images/foot.svg';
+import LostPin from '../assets/images/lostpin.svg';
+import FoundPin from '../assets/images/foundpin.svg';
+
+import {
+  apiClient,
+  getAllDogTypes,
+  geocodeAddress,
+  getCoordinatesByPlaceId,
+  getDogBreedFromImage,
+} from '../service/mockApi';
+import { GeocodeResult, Post, PostPayload } from '../types';
+import { mapGenderToKorean } from '../utils/format';
+import { getAddressFromCoordinates } from '../utils/location';
+import MapViewComponent from './MapViewComponent';
+
+// --- 타입 정의 ---
+export interface WritePostFormRef {
+  submit: () => void;
 }
 
-const mockAiExtraction = (imageUri: string) => {
-  console.log('AI가 사진 특징을 분석합니다...', imageUri);
-  return {
-    species: '푸들',
-    color: '갈색',
-    gender: '수컷',
-  };
-};
+interface PhotoItem {
+  key: string;
+  uri: string;
+}
+interface MarkerCoords {
+  latitude: number;
+  longitude: number;
+  title: string;
+  description?: string;
+}
+interface MapRegion {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+}
+interface WritePostFormProps {
+  postType: 'lost' | 'found';
+  onSave: (
+    postData: PostPayload,
+    newImageUris: string[],
+    existingImageUrls: string[],
+    deletedImageUrls: string[],
+    aiImage: string | null,
+  ) => void;
+  isSaving: boolean;
+  initialData?: Post | null;
+  onFormUpdate: (isValid: boolean) => void;
+}
 
-const mockAiImageGeneration = (details: any) => {
-  console.log('AI가 이미지를 생성합니다...', details);
-  return 'https://via.placeholder.com/300/66ccff/ffffff?text=AI+Generated+Pet';
-};
+const WritePostForm = forwardRef<WritePostFormRef, WritePostFormProps>(
+  ({ postType, onSave, isSaving, initialData, onFormUpdate }, ref) => {
+  const initialPhotoUrlsRef = useRef<string[]>([]);
+  const [deletedImageUrls, setDeletedImageUrls] = useState<string[]>([]);
 
-const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
   const [form, setForm] = useState({
     title: '',
     species: '',
@@ -52,107 +97,195 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
     location: '',
   });
 
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [isSpeciesUnknown, setIsSpeciesUnknown] = useState(false);
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [aiImage, setAiImage] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [aiImageGenerating, setAiImageGenerating] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
-  const [showSpeciesPicker, setShowSpeciesPicker] = useState(false);
-  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [speciesQuery, setSpeciesQuery] = useState('');
+  const [speciesSuggestions, setSpeciesSuggestions] = useState<string[]>([]);
+  const [showSpeciesSuggestions, setShowSpeciesSuggestions] = useState(false);
+  const [allSpecies, setAllSpecies] = useState<string[]>([]);
 
-  const [mapRegion, setMapRegion] = useState({
+  useEffect(() => {
+    const fetchAllSpecies = async () => {
+      try {
+        const speciesList = await getAllDogTypes();
+        setAllSpecies(speciesList);
+      } catch (error) {
+        console.error('견종 전체 목록을 가져오는 데 실패했습니다:', error);
+      }
+    };
+    fetchAllSpecies();
+  }, []);
+
+  const [mapRegion, setMapRegion] = useState<MapRegion>({
     latitude: 37.5665,
     longitude: 126.9780,
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   });
-  const [markerCoordinates, setMarkerCoordinates] = useState<any | null>(null);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+
+  const [markerCoordinates, setMarkerCoordinates] = useState<MarkerCoords | null>(null);
+  const [searchResults, setSearchResults] = useState<GeocodeResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const navigation = useNavigation();
+  const dateArrayToDate = (dateArray: number[]): Date => {
+    if (!dateArray || dateArray.length < 3) {
+        return new Date(); 
+    }
+
+    return new Date(dateArray[0], dateArray[1] - 1, dateArray[2], dateArray[3] || 0, dateArray[4] || 0, dateArray[5] || 0);
+  }
+
+  useEffect(() => {
+    if (initialData) {
+      const koreanGender = mapGenderToKorean(initialData.gender);
+      const initialUris = initialData.photos || [];
+      initialPhotoUrlsRef.current = initialUris;
+
+      if (initialData.species === '모름') {
+        setIsSpeciesUnknown(true);
+      }
+
+      const initialDate = initialData.date ? dateArrayToDate(initialData.date as number[]) : new Date();
+
+      setForm(prev => ({
+        ...prev,
+        title: initialData.title || '',
+        species: initialData.species || '',
+        color: initialData.color || '',
+        gender: koreanGender === '알 수 없음' ? '모름' : koreanGender,
+        name: initialData.name || '',
+        features: initialData.features || '',
+        date: initialDate,
+        time: initialDate,
+        location: initialData.location || '', // 기본 위치 설정
+      }));
+
+      setPhotos(initialUris.map(uri => ({ key: Math.random().toString(), uri })))
+      if (initialData.species && initialData.species !== '모름') {
+        setSpeciesQuery(initialData.species);
+      }
+
+      const fetchAndSetAddress = async () => {
+        if (initialData.latitude && initialData.longitude) {
+          const fullAddress = await getAddressFromCoordinates(initialData.latitude, initialData.longitude);
+          setForm(prev => ({ ...prev, location: fullAddress }));
+          setSearchQuery(fullAddress);
+
+          setMapRegion({
+            latitude: initialData.latitude,
+            longitude: initialData.longitude,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          });
+          setMarkerCoordinates({
+            latitude: initialData.latitude,
+            longitude: initialData.longitude,
+            title: fullAddress,
+            description: '기존 장소',
+          });
+        }
+      };
+
+      fetchAndSetAddress();
+    }
+  }, [initialData]);
 
   const handleInputChange = (key: string, value: string) => {
     setForm(prevForm => ({ ...prevForm, [key]: value }));
   };
-  
-  const handleSearchQueryChange = (value: string) => {
+
+  const handleSearchQueryChange = async (value: string) => {
     setSearchQuery(value);
     if (value.length > 1) {
-      const results = mockGeocode(value);
-      setSearchResults(results);
+      try {
+        const results = await geocodeAddress(value);
+        setSearchResults(results);
+      } catch (error) {
+        console.error('위치 검색 중 오류 발생:', error);
+        setSearchResults([]);
+      }
     } else {
       setSearchResults([]);
     }
   };
 
-  const handleLocationSelect = (item: any) => {
+  const handleLocationSelect = async (item: GeocodeResult) => {
     setForm(prevForm => ({ ...prevForm, location: item.address }));
     setSearchQuery(item.address);
-    setMapRegion({
-      latitude: item.latitude,
-      longitude: item.longitude,
-      latitudeDelta: 0.005,
-      longitudeDelta: 0.005,
-    });
-    setMarkerCoordinates({
-      latitude: item.latitude,
-      longitude: item.longitude,
-      title: item.address,
-      description: '선택된 장소',
-    });
     setSearchResults([]);
     setIsSearching(false);
-  };
-  
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    if (event.type === 'dismissed') {
-      setShowDatePicker(false);
-      return;
+
+    if (!item.id) return;
+
+    try {
+      const coordinates = await getCoordinatesByPlaceId(item.id);
+      setMapRegion({ ...coordinates, latitudeDelta: 0.005, longitudeDelta: 0.005 });
+      setMarkerCoordinates({ ...coordinates, title: item.address, description: '선택된 장소' });
+    } catch (error) {
+      console.error('좌표 조회 실패:', error);
+      setMarkerCoordinates(null);
     }
-    if (selectedDate) {
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS !== 'ios') setShowDatePicker(false);
+    if (selectedDate && event.type !== 'dismissed') {
       setForm(prevForm => ({ ...prevForm, date: selectedDate }));
     }
-    setShowDatePicker(false);
   };
 
   const handleTimeChange = (event: any, selectedTime?: Date) => {
-    if (event.type === 'dismissed') {
-      setShowTimePicker(false);
-      return;
-    }
-    if (selectedTime) {
+    if (Platform.OS !== 'ios') setShowTimePicker(false);
+    if (selectedTime && event.type !== 'dismissed') {
       setForm(prevForm => ({ ...prevForm, time: selectedTime }));
     }
-    setShowTimePicker(false);
   };
 
   const handleSpeciesSelect = (selectedSpecies: string) => {
     setForm(prevForm => ({ ...prevForm, species: selectedSpecies }));
-    setShowSpeciesPicker(false);
+    setSpeciesQuery(selectedSpecies);
+    setShowSpeciesSuggestions(false);
   };
 
-  const handleColorSelect = (selectedColor: string) => {
-    setForm(prevForm => ({ ...prevForm, color: selectedColor }));
-    setShowColorPicker(false);
+  const handleSpeciesQueryChange = async (query: string) => {
+    setSpeciesQuery(query);
+    setForm(prevForm => ({ ...prevForm, species: query }));
+
+    if (query.length >= 1) {
+        const suggestions = allSpecies.filter(s => s.toLowerCase().includes(query.toLowerCase()));
+        setSpeciesSuggestions(suggestions);
+        setShowSpeciesSuggestions(true);
+    } else {
+        setSpeciesSuggestions([]);
+        setShowSpeciesSuggestions(false);
+    }
+  };
+
+  const toggleSpeciesUnknown = () => {
+    const nextValue = !isSpeciesUnknown;
+    setIsSpeciesUnknown(nextValue);
+    if (nextValue) {
+      setForm(prev => ({ ...prev, species: '모름' }));
+      setSpeciesQuery('모름');
+      setShowSpeciesSuggestions(false);
+    } else {
+      setForm(prev => ({ ...prev, species: '' }));
+      setSpeciesQuery('');
+    }
   };
 
   const renderDatePicker = () => (
     <Modal visible={showDatePicker} transparent animationType="fade">
       <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowDatePicker(false)}>
         <View style={styles.pickerContainer}>
-          <DateTimePicker
-            value={form.date}
-            mode="date"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={(event, selectedDate) => {
-              setShowDatePicker(false);
-              if (selectedDate) handleDateChange(event, selectedDate);
-            }}
-          />
+          <DateTimePicker value={form.date} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={handleDateChange} />
         </View>
       </TouchableOpacity>
     </Modal>
@@ -162,86 +295,29 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
     <Modal visible={showTimePicker} transparent animationType="fade">
       <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowTimePicker(false)}>
         <View style={styles.pickerContainer}>
-          <DateTimePicker
-            value={form.time}
-            mode="time"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={(event, selectedTime) => {
-              setShowTimePicker(false);
-              if (selectedTime) handleTimeChange(event, selectedTime);
-            }}
-          />
-        </View>
-      </TouchableOpacity>
-    </Modal>
-  );
-
-  const renderSpeciesPicker = () => (
-    <Modal visible={showSpeciesPicker} transparent animationType="fade">
-      <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowSpeciesPicker(false)}>
-        <View style={styles.pickerListContainer}>
-          {getSpeciesList().map((species, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.pickerItem}
-              onPress={() => handleSpeciesSelect(species)}
-            >
-              <Text>{species}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </TouchableOpacity>
-    </Modal>
-  );
-
-  const renderColorPicker = () => (
-    <Modal visible={showColorPicker} transparent animationType="fade">
-      <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowColorPicker(false)}>
-        <View style={styles.pickerListContainer}>
-          {getColorList().map((color, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.pickerItem}
-              onPress={() => handleColorSelect(color)}
-            >
-              <Text>{color}</Text>
-            </TouchableOpacity>
-          ))}
+          <DateTimePicker value={form.time} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={handleTimeChange} />
         </View>
       </TouchableOpacity>
     </Modal>
   );
 
   const renderSearchResultsModal = () => (
-    <Modal
-      visible={isSearching}
-      animationType="slide"
-      onRequestClose={() => setIsSearching(false)}
-    >
-      <View style={styles.modalContent}>
-        <View style={styles.searchBarContainer}>
-          <TouchableOpacity onPress={() => setIsSearching(false)} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>닫기</Text>
-          </TouchableOpacity>
-          <TextInput
-            style={styles.modalInput}
-            placeholder="장소 검색"
-            value={searchQuery}
-            onChangeText={handleSearchQueryChange}
-            autoFocus={true}
+    <Modal visible={isSearching} transparent animationType="fade" onRequestClose={() => setIsSearching(false)}>
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={() => setIsSearching(false)}>
+        <TouchableOpacity activeOpacity={1} style={styles.popupModalContent}>
+          <View style={styles.searchBarContainer}>
+            <TextInput style={styles.modalInput} placeholder="장소 검색" value={searchQuery} onChangeText={handleSearchQueryChange} autoFocus />
+          </View>
+          <FlatList
+            data={searchResults}
+            keyExtractor={item => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.searchResultItem} onPress={() => handleLocationSelect(item)}><Text>{item.address}</Text></TouchableOpacity>
+            )}
+            ListEmptyComponent={<Text style={styles.emptyText}>검색 결과가 없습니다.</Text>}
           />
-        </View>
-        <FlatList
-          data={searchResults}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.searchResultItem} onPress={() => handleLocationSelect(item)}>
-              <Text>{item.address}</Text>
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={<Text style={styles.emptyText}>검색 결과가 없습니다.</Text>}
-        />
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 
@@ -254,464 +330,660 @@ const WritePostForm: React.FC<WritePostFormProps> = ({ type, onSubmit }) => {
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      selectionLimit: 10,
-      quality: 1,
-    });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsMultipleSelection: true, selectionLimit: 10 - photos.length, quality: 1 });
 
     if (!result.canceled && result.assets) {
-      setPhotos(result.assets.map(asset => asset.uri));
-      setAiImage(null);
-      if (result.assets.length > 0) {
-        const aiFeatures = mockAiExtraction(result.assets[0].uri);
-        setForm(prevForm => ({
-          ...prevForm,
-          species: aiFeatures.species,
-          color: aiFeatures.color,
-          gender: aiFeatures.gender,
-        }));
+      const processedImages: PhotoItem[] = [];
+      for (const asset of result.assets) {
+        try {
+          const manipResult = await ImageManipulator.manipulateAsync(asset.uri, [{ resize: { width: 1080 } }], { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG });
+          processedImages.push({ key: Math.random().toString(), uri: manipResult.uri });
+        } catch (error) { console.error("Image manipulation failed:", error); }
+      }
+
+      if (processedImages.length > 0) {
+        setPhotos(prev => [...prev, ...processedImages]);
+        setAiImage(null);
+        if (photos.length === 0) { 
+          try {
+            const breed = await getDogBreedFromImage(processedImages[0].uri);
+            setForm(prevForm => ({ ...prevForm, species: breed }));
+            setSpeciesQuery(breed);
+          } catch (error) {
+            Alert.alert('견종 분석 실패', '사진에서 견종을 자동으로 인식하지 못했습니다. 직접 입력해주세요.');
+            console.error(error);
+          }
+        }
       }
     }
-
     setImageLoading(false);
   };
 
-  const removePhoto = (index: number) => {
-    setPhotos(prevPhotos => prevPhotos.filter((_, i) => i !== index));
+  const removePhoto = (key: string) => {
+    const photoToRemove = photos.find(p => p.key === key);
+    if (photoToRemove) {
+      if (initialPhotoUrlsRef.current.includes(photoToRemove.uri)) {
+        setDeletedImageUrls(prev => [...prev, photoToRemove.uri]);
+      }
+      setPhotos(prevPhotos => prevPhotos.filter(photo => photo.key !== key));
+    }
     if (photos.length === 1) {
-      setAiImage(null);
-      setForm(prevForm => ({
-        ...prevForm,
-        species: '',
-        color: '',
-        gender: '',
-      }));
+      setForm(prevForm => ({ ...prevForm, species: '', color: '', gender: '모름' }));
+      setSpeciesQuery('');
     }
   };
 
-  const handleAiImageGeneration = () => {
+  const removeAiImage = () => setAiImage(null);
+
+  const handleAiImageGeneration = async () => {
     if (photos.length > 0) return;
     setAiImageGenerating(true);
-    const details = { ...form, type };
-    const generatedImageUri = mockAiImageGeneration(details);
-    setAiImage(generatedImageUri);
-    setAiImageGenerating(false);
+    try {
+      const response = await apiClient.post(
+        '/ai-images',
+        {
+          breed: form.species,
+          colors: form.color,
+          features: form.features,
+        },
+        {
+          responseType: 'arraybuffer',
+          timeout: 30000, // AI 이미지 생성은 시간이 더 오래 걸릴 수 있으므로 타임아웃을 늘립니다.
+        },
+      );
+
+      const buffer = Buffer.from(response.data, 'binary');
+      const base64data = buffer.toString('base64');
+      const imageUri = `data:image/png;base64,${base64data}`;
+
+      setAiImage(imageUri);
+      setPhotos([]);
+    } catch (error) {
+      console.error('AI 이미지 생성 실패:', error);
+      Alert.alert(
+        '오류',
+        'AI 이미지 생성에 실패했습니다. 잠시 후 다시 시도해주세요.',
+      );
+    } finally {
+      setAiImageGenerating(false);
+    }
   };
 
-
-  const currentUserId = 'user_a';
-
-  const handleSubmit = () => {
-  // 필수 정보 누락 체크 로직
-  if (
-    !form.title ||
-    !form.species ||
-    !form.color ||
-    !form.gender ||
-    !form.date ||
-    !form.time ||
-    !form.location ||
-    (type === 'lost' && !form.name) ||
-    (photos.length === 0 && !aiImage)
-  ) {
-    Alert.alert('필수 정보 누락', '모든 정보를 입력하고 사진을 추가해 주세요.');
-    return;
-  }
-
-  const newPost = {
-    type,
-    title: form.title,
-    species: form.species,
-    color: form.color,
-    location: form.location,
-    date: form.date.toISOString(),
-    status: (type === 'lost' ? '실종' : '목격') as '실종' | '목격',
-    name: type === 'lost' ? form.name : undefined,
-    gender: form.gender,
-    features: form.features,
-    locationDetails: form.location,
-    latitude: mapRegion.latitude,
-    longitude: mapRegion.longitude,
+  const handleMarkerDragEnd = (coordinate: { latitude: number; longitude: number }) => {
+    setMarkerCoordinates(prev => prev ? { ...prev, ...coordinate } : null);
+    setMapRegion(prev => ({ ...prev, ...coordinate }));
   };
 
+  const handleSubmit = async () => {
+    if (!markerCoordinates) {
+      Alert.alert('필수 정보 누락', '지도에서 정확한 장소를 검색하고 선택해 주세요.');
+      return;
+    }
+    if (!form.title || !form.species || !form.color || (postType === 'lost' && !form.name)) {
+      Alert.alert('필수 정보 누락', '제목, 이름, 품종, 색상 등 필수 정보를 입력해주세요.');
+      return;
+    }
+    if (photos.length === 0 && !aiImage) {
+      Alert.alert('사진 필요', '사진을 한 장 이상 등록하거나 AI 이미지를 생성해주세요.');
+      return;
+    }
 
-  const addedPost = addPost(newPost, currentUserId);
+    const date = new Date(form.date);
+    date.setHours(form.time.getHours());
+    date.setMinutes(form.time.getMinutes());
 
-  onSubmit(addedPost);
-};
-  const isFormValid =
-    form.title &&
-    form.species &&
-    form.color &&
-    form.gender &&
-    form.location &&
-    (type === 'lost' ? form.name : true) &&
-    (photos.length > 0 || aiImage);
+    const postData: PostPayload = {
+      type: postType,
+      title: form.title,
+      species: form.species,
+      color: form.color,
+      date: date.toISOString(),
+      location: form.location,
+      latitude: markerCoordinates.latitude,
+      longitude: markerCoordinates.longitude,
+      name: postType === 'lost' ? form.name : undefined,
+      gender: form.gender === '모름' ? 'NEUTRAL' : form.gender === '수컷' ? 'MALE' : 'FEMALE',
+      features: form.features,
+      isAiImage: !!aiImage,
+    };
 
-  const formattedDate = form.date.toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-  const formattedTime = form.time.toLocaleTimeString('ko-KR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
+    let newImageUris: string[] = [];
+    const S3_BASE_URL = 'https://gangajikimi-server.s3.ap-northeast-2.amazonaws.com/';
+
+    if (!aiImage) {
+      const finalUris = photos.map(photo => photo.uri);
+      newImageUris = finalUris.filter(uri => uri && uri.startsWith('file://'));
+    }
+
+    const finalUrisForExisting = photos.map(photo => photo.uri);
+    const existingImageUrls = finalUrisForExisting
+      .filter(uri => uri && !uri.startsWith('file://') && initialPhotoUrlsRef.current.includes(uri))
+      .map(uri => uri.split('?')[0].replace(S3_BASE_URL, ''));
+    const validDeletedImageUrls = deletedImageUrls
+      .filter(uri => uri)
+      .map(uri => uri.split('?')[0].replace(S3_BASE_URL, ''));
+
+    onSave(postData, newImageUris, existingImageUrls, validDeletedImageUrls, aiImage);
+  };
+
+  const isGenerateImageEnabled = !!(form.species && form.color);
+  const isFormValid = !!(form.title && form.species && form.color && form.gender && form.location && (postType === 'lost' ? form.name : true) && (photos.length > 0 || aiImage) && markerCoordinates);
+
+  useImperativeHandle(ref, () => ({ submit: handleSubmit }));
+
+  useEffect(() => {
+    onFormUpdate(!!isFormValid);
+  }, [isFormValid, onFormUpdate]);
+
+  const formattedDate = form.date.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
+  const formattedTime = form.time.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+  const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<PhotoItem>) => (
+    <ScaleDecorator>
+      <TouchableOpacity onLongPress={drag} disabled={isActive} style={styles.thumbnailContainer}>
+        <Image source={{ uri: item.uri }} style={styles.thumbnail} />
+        <TouchableOpacity style={styles.removeButton} onPress={() => removePhoto(item.key)}>
+          <Text style={styles.removeButtonText}>×</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </ScaleDecorator>
+  );
+
+  const renderAiButton = () => {
+    const buttonContent = (
+        <>
+            <AiIcon />
+            <Text style={[styles.aiButtonText, !isGenerateImageEnabled && styles.aiButtonTextDisabled]}>
+                강아지 이미지 생성하기
+            </Text>
+        </>
+    );
+
+    if (isGenerateImageEnabled) {
+        return (
+            <TouchableOpacity
+                onPress={handleAiImageGeneration}
+                disabled={aiImageGenerating}
+                style={styles.aiButton}
+            >
+                {aiImageGenerating ? <ActivityIndicator color="#000" /> : buttonContent}
+            </TouchableOpacity>
+        );
+    } else {
+        return (
+            <View style={[styles.aiButton, styles.aiButtonDisabled]}>
+                {buttonContent}
+            </View>
+        );
+    }
+  };
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.sectionDescription}>
-        사진을 올리면 AI가 특징을 자동으로 입력해줘요.
-      </Text>
-
-      <View style={styles.imageUploadSection}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageSlotContainer}>
-          <TouchableOpacity style={styles.addPhotoSlot} onPress={handleImagePicker}>
-            <Text style={styles.addPhotoText}>
-              사진 추가{'\n'}({photos.length}/10)
-            </Text>
-          </TouchableOpacity>
-          {photos.map((uri, idx) => (
-            <View key={idx} style={styles.imageSlot}>
-              <Image source={{ uri }} style={styles.uploadedImage} />
-              <TouchableOpacity style={styles.removeImageButton} onPress={() => removePhoto(idx)}>
-                <Text style={styles.removeImageText}>x</Text>
-              </TouchableOpacity>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={styles.formContainer}>
+        <View style={styles.sectionContainer}>
+          <Text style={styles.label}>강아지 사진</Text>
+          <View style={styles.imageUploadRow}>
+            <TouchableOpacity style={styles.addPhotoButton} onPress={handleImagePicker}>
+              {imageLoading ? (
+                <ActivityIndicator color="#9CA3AF" />
+              ) : (
+                <>
+                  <CameraIcon />
+                  <Text style={styles.addPhotoButtonText}>({photos.length}/10)</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <View style={styles.draggableListWrapper}>
+              {photos.length > 0 ? (
+                <DraggableFlatList
+                  data={photos}
+                  onDragEnd={({ data }) => setPhotos(data)}
+                  keyExtractor={item => item.key}
+                  renderItem={renderDraggableItem}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                />
+              ) : (
+                <View style={styles.photoPlaceholder} />
+              )}
             </View>
-          ))}
-        </ScrollView>
-      </View>
+          </View>
+        </View>
 
-
-      <View style={styles.formSection}>
-        <TextInput style={styles.input} placeholder="제목" value={form.title} onChangeText={(text) => handleInputChange('title', text)} />
-      </View>
-
-      <View style={styles.formSection}>
-        <Text style={styles.sectionTitle}>반려견 기본 정보</Text>
-        {type === 'lost' && (
+        <View style={styles.sectionContainer}>
+          <Text style={styles.label}>제목</Text>
           <TextInput
             style={styles.input}
-            placeholder="반려견 이름"
-            value={form.name}
-            onChangeText={(text) => handleInputChange('name', text)}
+            placeholder="글 제목"
+            placeholderTextColor="#9CA3AF"
+            value={form.title}
+            onChangeText={text => handleInputChange('title', text)}
           />
-        )}
-        <View style={styles.row}>
-          <TouchableOpacity
-            style={styles.halfInputContainer}
-            onPress={() => setShowSpeciesPicker(true)}
-          >
-            <Text style={styles.dropdownPlaceholder}>
-              {form.species || '품종 (AI 자동 입력)'}
-            </Text>
-            <DropdownIcon width={24} height={24} style={styles.dropdownIcon} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.halfInputContainer, { marginLeft: 8 }]}
-            onPress={() => setShowColorPicker(true)}
-          >
-            <Text style={styles.dropdownPlaceholder}>
-              {form.color || '색상 (AI 자동 입력)'}
-            </Text>
-            <DropdownIcon width={24} height={24} style={styles.dropdownIcon} />
-          </TouchableOpacity>
         </View>
 
-        <View style={styles.genderContainer}>
-          <Text style={styles.genderLabel}>성별</Text>
-          {['암컷', '수컷', '모름'].map(genderOption => (
-            <TouchableOpacity key={genderOption} style={styles.genderOption} onPress={() => handleInputChange('gender', genderOption)}>
-              <View style={[styles.radioIcon, form.gender === genderOption && styles.radioChecked]} />
-              <Text style={styles.genderOptionText}>{genderOption}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <TextInput
-          style={styles.multiLineInput}
-          placeholder="기타 성격, 특징, 착용물 등 자세히 작성"
-          multiline
-          numberOfLines={4}
-          value={form.features}
-          onChangeText={(text) => handleInputChange('features', text)}
-        />
-      </View>
-      
-      {photos.length === 0 && (
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>AI 생성 이미지</Text>
-          <Text style={styles.aiImageDescription}>
-            사진이 없을 경우, 입력한 특징으로 AI 이미지를 생성해드려요.
-          </Text>
-          {aiImage && (
-            <Image source={{ uri: aiImage }} style={styles.aiGeneratedImage} />
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <LogoIcon width={24} height={24} />
+            <Text style={styles.sectionHeaderText}>강아지 기본 정보</Text>
+          </View>
+          {postType === 'lost' && (
+            <View style={styles.inputRow}>
+              <Text style={styles.inputLabel}>이름</Text>
+              <TextInput
+                style={[styles.input, styles.halfInput]}
+                placeholder="강아지 이름 입력"
+                placeholderTextColor="#9CA3AF"
+                value={form.name}
+                onChangeText={text => handleInputChange('name', text)}
+              />
+            </View>
           )}
-          <TouchableOpacity
-            style={[
-              styles.aiGenerateButton,
-              aiImageGenerating && styles.disabledButton,
-            ]}
-            onPress={handleAiImageGeneration}
-            disabled={aiImageGenerating}
-          >
-            <Text style={styles.aiGenerateButtonText}>
-              {aiImageGenerating ? 'AI 이미지 생성 중...' : '이미지 생성하기'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      <View style={styles.formSection}>
-        <Text style={styles.sectionTitle}>
-          {type === 'lost' ? '실종 정보' : '목격 정보'}
-        </Text>
-        <View style={styles.row}>
-          <TouchableOpacity style={[styles.input, styles.halfInput]} onPress={() => setShowDatePicker(true)}>
-            <Text style={{ color: '#333' }}>{formattedDate}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.input, styles.halfInput, { marginLeft: 8 }]} onPress={() => setShowTimePicker(true)}>
-            <Text style={{ color: '#333' }}>{formattedTime}</Text>
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity style={styles.input} onPress={() => {
-          setIsSearching(true);
-          setSearchQuery(form.location);
-        }}>
-          <Text style={{ color: form.location ? '#333' : '#888' }}>
-            {form.location || '장소 (위치 검색)'}
-          </Text>
-        </TouchableOpacity>
-        <View style={styles.mapContainer}>
-          <MapViewComponent
-            initialRegion={mapRegion}
-            markerCoords={markerCoordinates}
+          <View style={styles.inputRow}>
+            <Text style={styles.inputLabel}>품종</Text>
+            <View style={styles.halfInputContainer}>
+              <TextInput
+                style={[styles.input, styles.halfInput, isSpeciesUnknown && styles.disabledInput]}
+                placeholder="사진 등록 시 품종이 자동으로 입력돼요!"
+                placeholderTextColor="#9CA3AF"
+                value={isSpeciesUnknown ? '모름' : speciesQuery}
+                onChangeText={handleSpeciesQueryChange}
+                onFocus={() => setShowSpeciesSuggestions(true)}
+                editable={!isSpeciesUnknown}
+              />
+              {showSpeciesSuggestions && !isSpeciesUnknown && (
+                <View style={styles.suggestionsContainer}>
+                  {speciesSuggestions.map((suggestion, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.suggestionItem}
+                      onPress={() => handleSpeciesSelect(suggestion)}>
+                      <Text style={styles.suggestionText}>{suggestion}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+            <TouchableOpacity onPress={toggleSpeciesUnknown} style={styles.checkboxContainer}>
+                <View style={[styles.checkbox, isSpeciesUnknown && styles.checkboxSelected]}>
+                    {isSpeciesUnknown && <Text style={styles.checkboxCheckmark}>✓</Text>}
+                </View>
+                <Text style={styles.checkboxLabel}>모름</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.inputRow}>
+            <Text style={styles.inputLabel}>색상</Text>
+            <TextInput
+              style={[styles.input, styles.halfInput]}
+              placeholder="예: 흰색, 갈색 ..."
+              placeholderTextColor="#9CA3AF"
+              value={form.color}
+              onChangeText={text => handleInputChange('color', text)}
+            />
+          </View>
+          <View style={styles.genderContainer}>
+            <Text style={styles.genderLabel}>성별</Text>
+            {['암컷', '수컷', '모름'].map(g => (
+              <TouchableOpacity
+                key={g}
+                style={styles.radioContainer}
+                onPress={() => handleInputChange('gender', g)}>
+                <View style={[styles.radio, form.gender === g && styles.radioSelected]}>
+                  {form.gender === g && <View style={styles.radioInnerCircle} />}
+                </View>
+                <Text style={styles.radioLabel}>{g}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            placeholder={"강아지 특징을 자세히 입력할수록 매칭 확률이 높아져요!\n ex) 작은 체형, 귀가 쫑긋하고 꼬리가 말려있음."}
+            placeholderTextColor="#9CA3AF"
+            multiline
+            value={form.features}
+            onChangeText={text => handleInputChange('features', text)}
           />
         </View>
+
+        {photos.length === 0 && (
+          <View style={styles.sectionContainer}>
+            <Text style={[styles.label, styles.aiImageTitle]}>사진이 없으면 글을 등록할 수 없어요.</Text>
+            <Text style={styles.aiHelperText}>입력하신 정보로 강아지 이미지를 만들어드릴게요!</Text>
+            {aiImage && (
+              <View style={styles.aiImageContainer}>
+                <Image source={{ uri: aiImage }} style={styles.aiGeneratedImage} />
+                <TouchableOpacity style={styles.removeAiImageButton} onPress={removeAiImage}>
+                  <Text style={styles.removeAiImageText}>×</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {!aiImage && renderAiButton()}
+          </View>
+        )}
+
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <FootIcon width={24} height={24} color="#000" />
+            <Text style={styles.sectionHeaderText}>{postType === 'lost' ? '실종 정보' : '발견 정보'}</Text>
+          </View>
+          <View style={styles.rowInputContainer}>
+            <TouchableOpacity style={[styles.input, styles.halfInput, styles.iconInput]} onPress={() => setShowDatePicker(true)}>
+              <CalendarIcon width={20} height={20} color="#000" style={{marginRight: 8}} />
+              <Text style={styles.dateText}>{formattedDate}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.input, styles.halfInput, styles.iconInput]} onPress={() => setShowTimePicker(true)}>
+              <ClockIcon width={20} height={20} color="#000" style={{marginRight: 8}} />
+              <Text style={styles.dateText}>{formattedTime}</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={[styles.input, styles.locationInput]}
+            onPress={() => {
+              setIsSearching(true);
+              setSearchQuery(form.location);
+            }}>
+            <LocationIcon width={20} height={20} color={form.location ? "#000" : "#9CA3AF"} />
+            <View style={{ flex: 1 }}> 
+              <Text style={styles.locationText} numberOfLines={1} ellipsizeMode="tail">
+                {form.location || (postType === 'lost' ? '강아지가 실종된 위치를 검색하세요.' : '강아지를 발견한 위치를 검색하세요.')}
+              </Text>
+            </View>
+          </TouchableOpacity>
+          <View style={styles.mapContainer}>
+            <MapViewComponent
+              region={mapRegion}
+              markers={markerCoordinates ? [{
+                latitude: markerCoordinates.latitude,
+                longitude: markerCoordinates.longitude,
+                component: postType === 'lost' ? <LostPin width={40} height={40} /> : <FoundPin width={40} height={40} />,
+              }] : []}
+              onMarkerDragEnd={handleMarkerDragEnd}
+            />
+          </View>
+        </View>
+
+        {showDatePicker && renderDatePicker()}
+        {showTimePicker && renderTimePicker()}
+        {isSearching && renderSearchResultsModal()}
+
       </View>
-      
-      {showDatePicker && renderDatePicker()}
-      {showTimePicker && renderTimePicker()}
-      {showSpeciesPicker && renderSpeciesPicker()}
-      {showColorPicker && renderColorPicker()}
-      {isSearching && renderSearchResultsModal()} 
-
-
-      <TouchableOpacity
-        style={[styles.submitButton, !isFormValid && styles.disabledButton]}
-        onPress={handleSubmit}
-        disabled={!isFormValid}
-      >
-        <Text style={styles.submitButtonText}>작성 완료</Text>
-      </TouchableOpacity>
-    </ScrollView>
+    </GestureHandlerRootView>
   );
-};
+});
 
 const styles = StyleSheet.create({
-  content: {
-    padding: 16,
-    paddingBottom: 40,
+  formContainer: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 14,
+    shadowColor: 'rgba(0, 0, 0, 0.25)',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 5,
+    marginTop: 5,
   },
-  sectionDescription: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  imageUploadSection: {
-    marginBottom: 20,
-  },
-  imageSlotContainer: {
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  addPhotoSlot: {
-    width: 100,
-    height: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    backgroundColor: '#f7f7f7',
-    marginRight: 8,
-  },
-  addPhotoText: {
-    fontSize: 12,
-    color: '#888',
-    textAlign: 'center',
-  },
-  imageSlot: {
-    width: 100,
-    height: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  uploadedImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  removeImageButton: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 10,
-    width: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeImageText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    fontSize: 16,
-  },
-  formSection: {
+  sectionContainer: {
     marginBottom: 24,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    color: '#333',
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 8,
   },
-  row: {
+  sectionHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  halfInput: {
-    flex: 1,
+  sectionHeaderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginLeft: 8,
+  },
+  input: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    height: 42, // Explicitly set height
+    fontSize: 13,
+    lineHeight: 18, // Explicitly set line height
+    color: '#1F2937',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    flexDirection: 'row',
+    alignItems: 'center',
+    textAlignVertical: 'center', // Vertically center the text
+  },
+  disabledInput: {
+    backgroundColor: '#F3F4F6',
+    color: '#9CA3AF',
+  },
+  iconInput: {
+    // justifyContent: 'center', // 왼쪽 정렬
+  },
+  multilineInput: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+    paddingTop: 12,
+    alignItems: 'flex-start',
+    marginBottom: 60, // Added margin bottom
+  },
+  rowInputContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  inputLabel: {
+    width: 40,
+    fontSize: 14,
+    color: '#424242',
+    marginRight: 10,
   },
   halfInputContainer: {
     flex: 1,
     position: 'relative',
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#ccc',
+  },
+  halfInput: {
+    flex: 1,
+  },
+  imageUploadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addPhotoButton: {
+    width: 80,
+    height: 80,
     borderRadius: 8,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     justifyContent: 'center',
-    paddingLeft: 12,
+    alignItems: 'center',
+    marginRight: 8,
   },
-  dropdownPlaceholder: {
-    color: '#888',
-    fontSize: 16,
+  addPhotoButtonText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#9CA3AF',
   },
-  dropdownIcon: {
+  draggableListWrapper: {
+    flex: 1,
+    height: 80,
+  },
+  photoPlaceholder: {
+    flex: 1,
+    height: 80,
+  },
+  thumbnailContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 8,
+    position: 'relative',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  removeButton: {
     position: 'absolute',
-    right: 12,
-    top: 12,
+    top: -4,
+    right: -4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  removeButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 12,
   },
   genderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginTop: 16,
+    marginBottom: 8,
   },
   genderLabel: {
-    fontSize: 16,
-    marginRight: 16,
-    color: '#333',
-    fontWeight: 'bold',
+    fontSize: 14,
+    color: '#424242',
+    marginRight: 28,
+    fontWeight: 'normal',
+    marginBottom: 20,
   },
-  genderOption: {
+  radioContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 20,
+    marginRight: 16,
+    marginBottom: 20,
   },
-  radioIcon: {
+  radio: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#ccc',
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#FFF',
   },
-  radioChecked: {
+  radioSelected: {
+    borderColor: '#8ED7FF',
+    backgroundColor: '#8ED7FF',
+  },
+  radioInnerCircle: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#333',
+    backgroundColor: '#FFF',
   },
-  genderOptionText: {
-    fontSize: 16,
-    color: '#333',
+  radioLabel: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#424242',
   },
-  multiLineInput: {
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 16,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  checkboxSelected: {
+    backgroundColor: '#8ED7FF',
+    borderColor: '#8ED7FF',
+  },
+  checkboxCheckmark: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    color: '#424242',
+  },
+  aiImageTitle: {
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#48BEFF',
+    marginBottom: 4,
+  },
+  aiHelperText: {
+    textAlign: 'center',
+    color: '#48BEFF',
+    fontSize: 12,
+    marginBottom: 16,
+  },
+  aiButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 50,
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    fontSize: 16,
-    minHeight: 100,
-    textAlignVertical: 'top',
+    borderColor: '#48BEFF',
+    backgroundColor: '#8ED7FF',
+  },
+  aiButtonDisabled: {
+    borderColor: '#D6D6D6',
+    backgroundColor: '#F4F4F4',
+  },
+  aiButtonText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000',
+  },
+  aiButtonTextDisabled: {
+    color: '#A0A0A0',
+  },
+  dateText: {
+    fontSize: 15,
+    color: '#1F2937',
+  },
+  locationInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginLeft: 8,
   },
   mapContainer: {
-    height: 200,
-    width: '100%',
+    height: 180,
     borderRadius: 8,
     overflow: 'hidden',
-  },
-  aiImageDescription: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  aiGenerateButton: {
-    backgroundColor: '#e0e0e0',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  aiGenerateButtonText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: 'bold',
-  },
-  aiGeneratedImage: {
-    width: '100%',
-    height: 200,
-    resizeMode: 'cover',
-    borderRadius: 8,
-    marginBottom: 12,
+    marginTop: 8,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  submitButton: {
-    backgroundColor: '#FF8C00',
-    paddingVertical: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  submitButtonText: {
-    fontSize: 18,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  disabledButton: {
-    backgroundColor: '#D3D3D3',
+    borderColor: '#E5E7EB',
   },
   modalOverlay: {
     flex: 1,
@@ -720,52 +992,37 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
   },
   pickerContainer: {
-    backgroundColor: 'white',
+    backgroundColor: '#424242',
     borderRadius: 12,
     padding: 16,
     width: '80%',
+    alignItems: 'center',
   },
-  pickerListContainer: {
+  popupModalContent: {
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 10,
-    width: '80%',
-    maxHeight: 200,
-  },
-  pickerItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    alignItems: 'center',
-  },
-  modalContent: {
-    flex: 1,
-    backgroundColor: '#fff',
-    paddingTop: Platform.OS === 'ios' ? 50 : 0,
+    width: '90%',
+    maxHeight: '70%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   searchBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    borderBottomColor: '#eee',
   },
   modalInput: {
-    flex: 1,
     height: 40,
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 8,
     paddingHorizontal: 10,
-  },
-  closeButton: {
-    padding: 10,
-  },
-  closeButtonText: {
     fontSize: 16,
-    color: '#007AFF',
-    marginRight: 10,
+    color: '#333',
   },
   searchResultItem: {
     padding: 16,
@@ -776,6 +1033,57 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
     color: '#888',
+  },
+  suggestionsContainer: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    maxHeight: 150,
+    zIndex: 10,
+    elevation: 5,
+  },
+  suggestionItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  suggestionText: {
+    fontSize: 15,
+    color: '#1F2937',
+  },
+  aiImageContainer: {
+    position: 'relative',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  aiGeneratedImage: {
+    width: '100%',
+    height: 300,
+    resizeMode: 'cover',
+  },
+  removeAiImageButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeAiImageText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
 

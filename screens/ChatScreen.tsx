@@ -1,123 +1,98 @@
-import React, { useState, useEffect, useCallback, useContext } from 'react';
-import { View, ScrollView, SafeAreaView, StyleSheet, Alert } from 'react-native';
-import { useNavigation, useFocusEffect, type NavigationProp } from '@react-navigation/native';
-import AppHeader from '../components/AppHeader';
-import ChatItem from '../components/ChatItem';
-import { getChatRoomsByUserId, getPostById,  getUserName, readChatRoom } from '../service/mockApi';
-import { RootStackParamList, ChatRoom, Post, } from '../types';
-import { AuthContext } from '../App'; 
-
-interface TransformedChatData {
-  id: string;
-  name: string;
-  location: string;
-  time: string;
-  title: string;
-  lastMessage: string;
-  status: '실종' | '목격' | '귀가 완료';
-  unreadCount: number;
-  postId: string;
-  chatContext: 'match' | 'lostPostReport' | 'witnessedPostReport';
-}
+import { useFocusEffect, useNavigation, type NavigationProp } from '@react-navigation/native';
+import React from 'react';
+import { Alert, SafeAreaView, ScrollView, StyleSheet, View, Text, ActivityIndicator } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import ChatItem, { ChatData } from '../components/ChatItem';
+import { useBadge } from '../contexts/BadgeContext';
+import { useAuth } from '../hooks/useAuth';
+import { RootStackParamList, ChatRoomFromApi } from '../types';
+import { formatRelativeTime } from '../utils/time';
 
 const ChatScreen = () => {
-  const [chatList, setChatList] = useState<TransformedChatData[]>([]);
-  
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const authContext = useContext(AuthContext); 
-  const { isLoggedIn, userNickname } = authContext || { isLoggedIn: false, userNickname: null };
-  const currentUserId = userNickname; 
-
-  const loadChats = async () => {
-
-    if (!isLoggedIn || !currentUserId) {
-      setChatList([]); 
-      return;
-    }
-
-    try {
-      const rooms = await getChatRoomsByUserId(currentUserId);
-      
-      const transformedChats = await Promise.all(
-        rooms.map(async (room) => {
-          const post = getPostById(room.postId);
-          
-          const otherParticipantId = room.participants.find(id => id !== currentUserId);
-          const name = getUserName(otherParticipantId || '');
-          
-          const location = post?.location || '위치 정보 없음';
-          const time = post?.date || '날짜 정보 없음';
-          const title = post?.title || '제목 없음';
-          
-          const unreadCount = room.unreadCounts[currentUserId] || 0;
-          const chatContext = room.chatContext;
-
-          return {
-            id: room.id,
-            name,
-            location,
-            time,
-            title,
-            lastMessage: room.lastMessage,
-            status: post?.status || '실종',
-            unreadCount,
-            postId: room.postId,
-            chatContext: chatContext,
-          };
-        })
-      );
-      setChatList(transformedChats);
-    } catch (error) {
-      console.error('채팅 목록을 불러오는 중 오류 발생:', error);
-      Alert.alert('오류', '채팅 목록을 불러올 수 없습니다.');
-    }
-  };
+  const { isLoggedIn } = useAuth();
+  const { chatList, isLoading, fetchChatData } = useBadge();
 
   useFocusEffect(
     React.useCallback(() => {
-      loadChats();
-    }, [isLoggedIn])
+      if (isLoggedIn) {
+        fetchChatData();
+      }
+    }, [isLoggedIn, fetchChatData])
   );
   
-  const handlePressChat = async (chatItem: TransformedChatData) => {
+  const handlePressChat = (chatItem: ChatRoomFromApi) => {
     if (!isLoggedIn) {
       Alert.alert('로그인 필요', '채팅을 이용하려면 로그인해야 합니다.');
       return;
     }
-    
-    if (chatItem.unreadCount > 0) {
-      await readChatRoom(chatItem.id, currentUserId || '');
-      await loadChats(); 
-    }
-    navigation.navigate('ChatDetail', { 
-      postId: chatItem.postId,
-      chatContext: chatItem.chatContext,
-      chatRoomId: chatItem.id,
+
+    console.log('chatItem.chatContext from ChatScreen:', chatItem.chatContext);
+
+    // `ChatDetailScreen`에 필요한 파라미터를 명시적으로 전달합니다.
+    // 이렇게 하면 불필요한 파라미터로 인해 예기치 않은 동작(예: 헤더 타이틀 변경)이 발생하는 것을 방지합니다.
+    navigation.navigate('ChatDetail', {
+      ...chatItem,
+      type: chatItem.postType === 'LOST' ? 'lost' : 'found',
     });
   };
 
+  const renderContent = () => {
+    if (isLoading) {
+      return <View style={styles.centered}><ActivityIndicator size="large" /></View>;
+    }
+    if (chatList.length === 0) {
+      return <View style={styles.centered}><Text>채팅 내역이 없습니다.</Text></View>;
+    }
+
+    const transformedChatList: ChatData[] = chatList.map(chat => ({
+      id: chat.id,
+      name: chat.partnerNickname,
+      postRegion: chat.postRegion,
+      time: chat.lastMessageTime ? formatRelativeTime(chat.lastMessageTime) : '',
+      title: chat.postTitle,
+      lastMessage: chat.lastMessage,
+      postType: chat.postType,
+      status: chat.status,
+      unreadCount: chat.unreadCount,
+      postImageUrl: chat.postImageUrl,
+      postDate: chat.postTime ?? undefined, // postTime을 postDate에 매핑
+    }));
+
+    return (
+      <ScrollView contentContainerStyle={styles.listContent}>
+        {transformedChatList.map((chat, index) => (
+          <ChatItem 
+            key={chat.id} 
+            chat={chat} 
+            onPress={() => handlePressChat(chatList[index])} 
+          />
+        ))}
+      </ScrollView>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <AppHeader showFilter={false} />
-      <View style={styles.listWrapper}>
-        <ScrollView contentContainerStyle={styles.listContent}>
-          {chatList.map((chat) => (
-            <ChatItem 
-              key={chat.id} 
-              chat={chat} 
-              onPress={() => handlePressChat(chat)} 
-            />
-          ))}
-        </ScrollView>
-      </View>
-    </SafeAreaView>
+    <LinearGradient
+      colors={['#FEFCE8', '#EFF6FF', '#F0F9FF']}
+      style={{flex: 1}}
+    >
+      <SafeAreaView style={styles.safeArea}>
+                <View style={styles.header}>
+          <Text style={styles.headerTitle}>채팅</Text>
+        </View>
+        <View style={styles.listWrapper}>
+          {renderContent()}
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
     flexDirection: 'column',
   },
   listWrapper: {
@@ -125,6 +100,23 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  header: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 0.8,
+    borderBottomColor: '#D6D6D6',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 600,
+    color: '#000',
   }
 });
 

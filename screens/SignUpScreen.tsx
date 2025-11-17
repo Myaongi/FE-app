@@ -1,9 +1,10 @@
-import React, { useState, useLayoutEffect } from 'react';
-import { SafeAreaView, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigation } from '../types';
-import { signup } from '../service/mockApi';
+import React, { useLayoutEffect, useState } from 'react';
+import { KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet } from 'react-native';
 import SignUpForm from '../components/SignUpForm';
+import SignUpSuccessModal from '../components/SignUpSuccessModal';
+import { signup } from '../service/mockApi';
+import { StackNavigation } from '../types';
 
 const SignUpScreen = () => {
   const navigation = useNavigation<StackNavigation>();
@@ -12,7 +13,7 @@ const SignUpScreen = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [memberName, setMemberName] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const isValidEmail = (email: string) => {
     const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
@@ -24,19 +25,15 @@ const SignUpScreen = () => {
   }, [navigation]);
 
   const handleNext = () => {
-    setError(null);
     if (step === 1) {
       if (!isValidEmail(email)) {
-        setError('유효하지 않은 이메일 주소입니다.');
         return;
       }
     } else if (step === 2) {
       if (password.length < 6) {
-        setError('비밀번호는 6자리 이상이어야 합니다.');
         return;
       }
       if (password !== confirmPassword) {
-        setError('비밀번호가 일치하지 않습니다.');
         return;
       }
     }
@@ -44,7 +41,6 @@ const SignUpScreen = () => {
   };
 
   const handleBack = () => {
-    setError(null);
     setStep(step - 1);
   };
 
@@ -53,26 +49,36 @@ const SignUpScreen = () => {
   };
 
   const handleSignUp = async () => {
+    console.log('📝 [SIGNUP SCREEN] 회원가입 버튼 클릭됨');
+    
     if (memberName.length < 2 || memberName.length > 10) {
-      setError('닉네임은 2자 이상 10자 이하여야 합니다.');
+      console.log('❌ [SIGNUP SCREEN] 닉네임 길이 검증 실패:', memberName.length);
       return;
     }
     
-    setError(null);
+    console.log('✅ [SIGNUP SCREEN] 입력 데이터 검증 통과:', { memberName, email });
 
     try {
+      console.log('🚀 [SIGNUP SCREEN] signup 함수 호출 시작');
       const response = await signup({ memberName, email, password });
       
+      console.log('📨 [SIGNUP SCREEN] signup 함수 응답 받음:', response);
+      
       if (response.isSuccess) {
-        Alert.alert('회원가입 성공', '로그인 화면으로 이동합니다.');
-        navigation.goBack();
+        console.log('🎉 [SIGNUP SCREEN] 회원가입 성공, 모달 표시');
+        setModalVisible(true);
       } else {
-        setError(response.message);
+        console.log('❌ [SIGNUP SCREEN] 회원가입 실패:', response.message);
       }
     } catch (err: any) {
-      const message = err.message || '회원가입 중 오류가 발생했습니다. 다시 시도해주세요.';
-      setError(message);
+      console.log('🚨 [SIGNUP SCREEN] 에러 발생:', err);
+      console.log('🚨 [SIGNUP SCREEN] 에러 메시지:', err.message);
     }
+  };
+
+  const handleConfirm = () => {
+    setModalVisible(false);
+    navigation.goBack();
   };
 
   return (
@@ -91,13 +97,13 @@ const SignUpScreen = () => {
           setConfirmPassword={setConfirmPassword}
           memberName={memberName}
           setMemberName={setMemberName}
-          error={error}
           onNext={handleNext}
           onBack={handleBack}
-          onClose={handleClose} // 💡 onBack 대신 onClose를 전달합니다.
+          onClose={handleClose}
           onSignUp={handleSignUp}
         />
       </KeyboardAvoidingView>
+      <SignUpSuccessModal visible={modalVisible} onConfirm={handleConfirm} />
     </SafeAreaView>
   );
 };
@@ -105,7 +111,7 @@ const SignUpScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFEF5',
   },
   keyboardView: {
     flex: 1,

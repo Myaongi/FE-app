@@ -1,3 +1,28 @@
+import { Post } from '../types';
+
+export const normalizeDate = (dateInput: number[] | string | Date): Date => {
+  if (dateInput instanceof Date) {
+    return dateInput;
+  }
+  if (typeof dateInput === 'string') {
+    // 빈 문자열이나 유효하지 않은 문자열은 Invalid Date를 반환하도록 처리
+    return dateInput ? new Date(dateInput) : new Date(NaN);
+  }
+  if (Array.isArray(dateInput) && dateInput.length > 0) {
+    // 배열의 각 요소에 기본값을 제공하여 undefined가 생성자에 전달되는 것을 방지
+    const year = dateInput[0] || 0;
+    const month = dateInput[1] ? dateInput[1] - 1 : 0; // 월은 0부터 시작
+    const day = dateInput[2] || 1;
+    const hour = dateInput[3] || 0;
+    const minute = dateInput[4] || 0;
+    const second = dateInput[5] || 0;
+    const millisecond = dateInput[6] || 0;
+    return new Date(year, month, day, hour, minute, second, millisecond);
+  }
+  // 유효하지 않은 타입이나 빈 배열은 Invalid Date 반환
+  return new Date(NaN);
+};
+
 // 1분 미만: "방금 전"
 
 // 1분 이상 ~ 59분 이하: "몇 분 전"
@@ -41,4 +66,22 @@ export const formatRelativeTime = (isoString: string): string => {
     const diffInYears = Math.floor(diffInMinutes / (60 * 24 * 365));
     return `${diffInYears}년 전`;
   }
+};
+
+export const formatDisplayDate = (dateArray: number[] | string | Date): string => {
+  const date = normalizeDate(dateArray);
+  if (isNaN(date.getTime())) {
+    return '날짜 정보 없음';
+  }
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}. ${month}. ${day}.`;
+};
+
+export const formatTime = (dateArray: number[] | string | Date): string => {
+  const date = normalizeDate(dateArray);
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
 };

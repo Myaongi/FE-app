@@ -1,0 +1,36 @@
+import * as React from 'react';
+import Svg, { Path } from 'react-native-svg';
+
+interface LogoIconProps {
+  color: string;
+  width?: number;
+  height?: number;
+}
+
+const LogoIcon = ({ color, width = 20, height = 20 }: LogoIconProps) => (
+  <Svg width={width} height={height} viewBox="0 0 25 25" fill="none">
+    <Path
+      d="M16.5415 14.8602V15.4308M11.1216 17.4276H12.8331L11.9774 18.2834L11.1216 17.4276Z"
+      stroke={color}
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M3.3286 11.7188C3.00985 12.952 2.84881 14.2207 2.84937 15.4945C2.84937 20.2549 6.93658 22.8473 11.9777 22.8473C17.0188 22.8473 21.106 20.2549 21.106 15.4945C21.1004 14.2154 20.9109 12.9439 20.5435 11.7188M7.41353 14.86V15.4306"
+      stroke={color}
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M7.98391 8.58441C7.54575 9.78251 6.74816 10.8984 5.30931 11.437C3.10596 12.2608 1.22895 11.0981 1.13766 10.296C1.00872 9.16178 2.48067 2.84498 5.70183 2.30869C7.89605 1.94241 9.86777 3.27287 9.86777 4.85891C11.311 4.49255 12.8248 4.50906 14.2596 4.90684C14.2596 3.32079 16.3637 1.94241 18.5579 2.30869C21.7791 2.84498 23.251 9.16178 23.1221 10.296C23.0308 11.0981 21.1538 12.2608 18.9505 11.437C17.5116 10.8984 16.8338 9.78251 16.3957 8.58441"
+      stroke={color}
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+export default LogoIcon;
