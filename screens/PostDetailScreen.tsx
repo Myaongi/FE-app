@@ -106,12 +106,31 @@ const PostDetailScreen = () => {
     setIsUpdateStatusSelectionModalVisible(false); // Close the selection modal immediately
 
     try {
-      // 1. 내 실종 게시글 상태 업데이트
+      // 1. 내 게시글 상태 업데이트
       await updateMultiplePostStatus(post.type, [Number(post.id)], 'RETURNED');
 
-      // 2. 선택된 발견 게시글들 상태 업데이트 (선택된 게시글이 있을 경우에만)
+      // 2. 선택된 연관 게시글들 상태 업데이트
       if (selectedIds && selectedIds.length > 0) {
-        await updateMultiplePostStatus('found', selectedIds, 'RETURNED');
+        const lostPostIds: number[] = [];
+        const foundPostIds: number[] = [];
+
+        selectedIds.forEach(matchingId => {
+          const match = matchingPostsWithChat.find(p => p.matchingId === matchingId);
+          if (match) {
+            if (match.type === 'lost') {
+              lostPostIds.push(Number(match.id));
+            } else {
+              foundPostIds.push(Number(match.id));
+            }
+          }
+        });
+
+        if (lostPostIds.length > 0) {
+          await updateMultiplePostStatus('lost', lostPostIds, 'RETURNED');
+        }
+        if (foundPostIds.length > 0) {
+          await updateMultiplePostStatus('found', foundPostIds, 'RETURNED');
+        }
       }
       
       setPost((prev) => (prev ? { ...prev, status: 'RETURNED' } : null));

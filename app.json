@@ -12,7 +12,15 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "반려동물 사진을 업로드하려면 사진첩 접근 권한이 필요합니다.",
-        "NSCameraUsageDescription": "반려동물 사진을 찍으려면 카메라 접근 권한이 필요합니다."
+        "NSCameraUsageDescription": "반려동물 사진을 찍으려면 카메라 접근 권한이 필요합니다.",
+        "NSAppTransportSecurity": {
+          "NSExceptionDomains": {
+            "54.180.51": {
+              "NSIncludesSubdomains": true,
+              "NSThirdPartyExceptionAllowsInsecureHTTPLoads": true
+            }
+          }
+        }
       },
       "bundleIdentifier": "com.anonymous.pet-finder-app",
       "config": {

@@ -13,10 +13,9 @@ import {
 } from './service/mockApi';
 import { deactivateClient } from './service/stompClient';
 
-// Components
+
 import AnimatedSplashScreen from './components/AnimatedSplashScreen';
 
-// Contexts
 import { BadgeProvider, useBadge } from './contexts/BadgeContext';
 
 // 화면 컴포넌트들
@@ -349,10 +348,6 @@ export default function App() {
       stopPeriodicLocationUpdates();
     };
   }, [isLoggedIn, startPeriodicLocationUpdates, stopPeriodicLocationUpdates]);
-
-  if (isLoading) {
-    return null;
-  }
 
   return (
     <AnimatedSplashScreen>

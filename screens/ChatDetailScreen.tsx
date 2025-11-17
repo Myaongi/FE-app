@@ -145,7 +145,7 @@ const ChatDetailScreen = () => {
         if (chatContext === 'lostPostReport') {
           const sightCardData = await getSightCardByChatRoomId(chatRoomId);
           setFetchedSightCard(sightCardData);
-          setCurrentMyLostPostId(postId); // Set currentMyLostPostId for lostPostReport context
+          setCurrentMyLostPostId(postId);
         }
       } catch (error) {
         console.error("초기 데이터 로딩 실패:", error);
@@ -266,7 +266,7 @@ const ChatDetailScreen = () => {
         latitude: opponentPostDetails.latitude,
         longitude: opponentPostDetails.longitude,
       });
-      setLastAddedSpotType('match'); // Set type
+      setLastAddedSpotType('match'); 
       setConfirmLocationModalVisible(true);
     } catch (error: any) {
       console.error("위치 정보 추가 실패:", error);
@@ -300,7 +300,7 @@ const ChatDetailScreen = () => {
     if (lastAddedSpotType === 'match') {
       lostPostIdToFetch = currentMyLostPostId;
     } else if (lastAddedSpotType === 'sighting') {
-      lostPostIdToFetch = postId; // Use postId from route.params for sighting context
+      lostPostIdToFetch = postId; 
     }
 
     if (!lostPostIdToFetch) {
@@ -331,7 +331,7 @@ const ChatDetailScreen = () => {
           addPoint({
             latitude: updatedPost.latitudes[i],
             longitude: updatedPost.longitudes[i],
-            dateTime: updatedPost.date, // Use post's main date as approximation
+            dateTime: updatedPost.date, 
           });
         }
       }
@@ -362,7 +362,7 @@ const ChatDetailScreen = () => {
       }
 
       if (newlyAddedSpot) {
-        addPoint(newlyAddedSpot); // addPoint handles duplicates
+        addPoint(newlyAddedSpot); 
       }
   
       const allPoints = Array.from(pointMap.values());
@@ -404,7 +404,7 @@ const ChatDetailScreen = () => {
     } else {
       Alert.alert("오류", "게시글 위치 정보를 불러오는 데 실패했습니다.");
     }
-    setLastAddedSpotType(null); // Reset after showing map
+    setLastAddedSpotType(null); 
   };
 
   const CustomMapMarker = ({ type, dateTime }: { type: 'lost' | 'found', dateTime: number[] | string | Date }) => (
@@ -425,7 +425,7 @@ const ChatDetailScreen = () => {
       <View style={[styles.messageContainer, isMyMessage ? styles.myMessageContainer : styles.otherMessageContainer]}>
         {isMyMessage && (
           <View style={styles.statusGroup}>
-            {!item.read && <Text style={styles.unreadIndicator}>1</Text>}
+            {!item.read && <Text style={styles.unreadIndicator}></Text>}
             <Text style={styles.statusTime}>{formatTime(item.time)}</Text>
           </View>
         )}
@@ -466,7 +466,6 @@ const ChatDetailScreen = () => {
     }
   }
 
-  // Hide the badge only if it's a 'foundPostReport' context and the current user is the owner of the found post.
   const shouldShowBadge = !(chatContext === 'foundPostReport' && isMyPost);
 
   return (

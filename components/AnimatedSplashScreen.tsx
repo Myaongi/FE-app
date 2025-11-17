@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 
-// Prevent native splash screen from autohiding
 SplashScreen.preventAutoHideAsync();
 
 interface AnimatedSplashScreenProps {
@@ -10,33 +9,31 @@ interface AnimatedSplashScreenProps {
 }
 
 export default function AnimatedSplashScreen({ children }: AnimatedSplashScreenProps) {
-  const [isSplashAnimationComplete, setSplashAnimationComplete] = useState(false);
+  const [isAppReady, setAppReady] = useState(false);
 
   useEffect(() => {
-    // This timeout simulates the GIF animation duration.
-    // Adjust the duration (in milliseconds) to match your GIF.
-    const animationTimer = setTimeout(() => {
-      setSplashAnimationComplete(true);
-    }, 3000); // 3 seconds
+    async function prepare() {
 
-    return () => clearTimeout(animationTimer);
+      await SplashScreen.hideAsync();
+      
+
+      const animationTimer = setTimeout(() => {
+        setAppReady(true);
+      }, 3000); 
+
+      return () => clearTimeout(animationTimer);
+    }
+
+    prepare();
   }, []);
 
-  useEffect(() => {
-    async function hideSplash() {
-      if (isSplashAnimationComplete) {
-        await SplashScreen.hideAsync();
-      }
-    }
-    hideSplash();
-  }, [isSplashAnimationComplete]);
-
-  if (!isSplashAnimationComplete) {
+  if (!isAppReady) {
     return (
       <View style={styles.container}>
         <Image
           source={require('../assets/images/splash.gif')}
           style={styles.gif}
+          onLoadEnd={() => console.log('GIF loaded')} 
         />
       </View>
     );
@@ -53,7 +50,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   gif: {
-    width: 200, // Adjust width as needed
-    height: 200, // Adjust height as needed
+    width: 200,
+    height: 200,
   },
 });
